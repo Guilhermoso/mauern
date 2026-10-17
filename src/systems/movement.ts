@@ -77,6 +77,12 @@ export function moveTo(sim: Sim, u: Unit, goal: Goal, opts: MoveOptions = {}): M
     u.pathKey = '';
     return 'moving';
   }
+  // Fim de um caminho incompleto (só chega perto do destino): entrar no tile basta. Ir até o centro
+  // dele pode ser impossível com outros aldeões parados ali, e eles ficariam se empurrando sem fim.
+  if (u.path.length === 1 && !u.pathComplete && nx === tx && ny === ty) {
+    u.path.shift();
+    return 'moving';
+  }
   if (stepToward(u, (nx + 0.5) * ts, (ny + 0.5) * ts)) u.path.shift();
   return 'moving';
 }

@@ -32,6 +32,8 @@ export const BALANCE = {
   },
   units: {
     nodeSearchRadius: 12, // raio (tiles) para achar outro recurso igual quando um acaba
+    dropsiteSearchRadius: 20, // raio (tiles) em volta do depósito para escolher o próximo recurso
+    maxGatherersPerNode: 3, // aldeões coletando o mesmo recurso ao mesmo tempo
     autoTaskRadius: 10, // raio para tarefas automáticas após construir
     maxTrainQueue: 10, // lotes na fila de um edifício
     maxBatch: 3, // unidades militares treinadas juntas num lote (aldeões: sempre 1)

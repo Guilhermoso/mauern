@@ -1,4 +1,5 @@
 import { BALANCE } from '../data/balance';
+import { findNearestNode, gathererCounts, nodeHasRoom } from './queries';
 import { BUILDING_DEFS, UNIT_DEFS } from '../data/defs';
 import type { Sim } from '../core/sim';
 import { newUnit, populationCap } from '../state';
@@ -51,7 +52,11 @@ function spawnUnit(sim: Sim, b: Building, kind: Unit['kind']): Unit {
   sim.state.units.push(u);
 
   if (b.rally) {
-    const node = b.rally.nodeId !== undefined ? sim.node(b.rally.nodeId) : undefined;
+    let node = b.rally.nodeId !== undefined ? sim.node(b.rally.nodeId) : undefined;
+    // Ponto de reunião num recurso lotado: vai ao igual mais próximo com vaga.
+    if (node && !nodeHasRoom(sim, node, u.id)) {
+      node = findNearestNode(sim, node.kind, node.tx, node.ty, BALANCE.units.nodeSearchRadius, [], gathererCounts(sim, u.id)) ?? node;
+    }
     if (node && UNIT_DEFS[kind].canGather) {
       setOrder(u, { type: 'gather', nodeId: node.id, nodeKind: node.kind, tx: node.tx, ty: node.ty, phase: 'collect', avoid: [] });
     } else {

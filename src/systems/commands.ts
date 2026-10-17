@@ -5,7 +5,7 @@ import { addLog, newBuilding } from '../state';
 import type { Building, BuildingKind, ResourceKind, Unit, UnitKind } from '../entities/types';
 import { TILE_INFO } from '../world/terrain';
 import { getTile } from '../world/world';
-import { farmTaken, findNearestNode, isExposed } from './queries';
+import { farmTaken, findNearestNode, gathererCounts, isExposed } from './queries';
 import { buildingMaxHp } from './modifiers';
 import { commandTrain } from './soldiers';
 import { commandHospital } from './hospital';
@@ -73,12 +73,24 @@ export function commandGather(sim: Sim, ids: readonly number[], nodeId: number):
   if (!isExposed(sim, node)) {
     node = findNearestNode(sim, node.kind, node.tx, node.ty, BALANCE.units.nodeSearchRadius) ?? node;
   }
-  for (const u of units(sim, ids)) {
+  // No máximo 3 aldeões por recurso: os que sobram vão para os iguais mais próximos com vaga.
+  const target = node;
+  const list = units(sim, ids);
+  for (const u of list) {
+    if (u.order.type === 'gather') setOrder(u, { type: 'idle' }); // libera a vaga que ocupava
+  }
+  const ts = sim.tileSize;
+  list.sort((a, b) => (a.x - target.tx * ts) ** 2 + (a.y - target.ty * ts) ** 2 - ((b.x - target.tx * ts) ** 2 + (b.y - target.ty * ts) ** 2));
+  for (const u of list) {
     if (!UNIT_DEFS[u.kind].canGather) {
-      commandMove(sim, [u.id], node.tx, node.ty);
+      commandMove(sim, [u.id], target.tx, target.ty);
       continue;
     }
-    setOrder(u, { type: 'gather', nodeId: node.id, nodeKind: node.kind, tx: node.tx, ty: node.ty, phase: 'collect', avoid: [] });
+    const counts = gathererCounts(sim, u.id);
+    const n = (counts.get(target.id) ?? 0) < BALANCE.units.maxGatherersPerNode
+      ? target
+      : findNearestNode(sim, target.kind, target.tx, target.ty, BALANCE.units.nodeSearchRadius, [], counts) ?? target;
+    setOrder(u, { type: 'gather', nodeId: n.id, nodeKind: n.kind, tx: n.tx, ty: n.ty, phase: 'collect', avoid: [] });
   }
   return null;
 }

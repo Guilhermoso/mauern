@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { Sim } from '../src/core/sim';
-import { populationCap } from '../src/state';
+import { newBuilding, populationCap } from '../src/state';
 import { BUILDING_DEFS, UNIT_DEFS } from '../src/data/defs';
 import {
   cancelTrain,
@@ -241,5 +241,40 @@ describe('aldeão preso', () => {
     commandGather(sim2, [u.id], s.world.resourceNodes[0].id);
     runSeconds(sim2, 20);
     expect(u.order.type).toBe('idle');
+  });
+});
+
+describe('escolha do próximo recurso', () => {
+  it('quando o recurso acaba, vai ao mais perto do depósito (não ao mais perto de onde estava)', () => {
+    const s = flatGame();
+    const camp = newBuilding(s.nextId++, 'lumberCamp', CENTER + 20, CENTER, true);
+    s.buildings.push(camp);
+    const a = addNode(s, 'tree', CENTER + 15, CENTER, 1);
+    const nearOld = addNode(s, 'tree', CENTER + 13, CENTER, 100);
+    const nearCamp = addNode(s, 'tree', CENTER + 18, CENTER + 3, 100);
+    const u = addVillager(s, CENTER + 14, CENTER + 1);
+    const sim = new Sim(s);
+    commandGather(sim, [u.id], a.id);
+    runSeconds(sim, 8);
+    expect(sim.node(a.id)).toBeUndefined();
+    expect(u.order.type === 'gather' && u.order.nodeId).toBe(nearCamp.id);
+    expect(nearOld.amount).toBe(100);
+  });
+
+  it('no máximo 3 aldeões por recurso: os outros vão para os vizinhos', () => {
+    const s = flatGame();
+    const trees = [0, 2, 4].map((dy) => addNode(s, 'tree', CENTER + 12, CENTER + dy, 100));
+    const vs = Array.from({ length: 7 }, (_, i) => addVillager(s, CENTER + 8, CENTER + i));
+    const sim = new Sim(s);
+    commandGather(sim, vs.map((v) => v.id), trees[0].id);
+    const count = (id: number) => vs.filter((v) => v.order.type === 'gather' && v.order.nodeId === id).length;
+    expect(count(trees[0].id)).toBe(3);
+    expect(count(trees[1].id)).toBe(3);
+    expect(count(trees[2].id)).toBe(1);
+    // Ao longo do trabalho, nenhum recurso passa de 3.
+    for (let i = 0; i < 6; i++) {
+      runSeconds(sim, 5);
+      for (const t of trees) expect(count(t.id)).toBeLessThanOrEqual(3);
+    }
   });
 });

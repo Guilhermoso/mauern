@@ -17,6 +17,9 @@ import {
   findFreeFarm,
   findNearestDropsite,
   findNearestNode,
+  gathererCounts,
+  nodeHasRoom,
+  pickNextNode,
   farmTaken,
   findUnfinishedBuilding,
   nodeResource,
@@ -143,14 +146,17 @@ function updateGather(sim: Sim, u: Unit, o: GatherOrder): void {
     if (dropPhase(sim, u) && u.order === o) {
       o.phase = 'collect';
       clearPath(u);
+      // Recurso lotado (mais de 3 aldeões): na volta, escolhe outro.
+      const n = sim.node(o.nodeId);
+      if (n && !nodeHasRoom(sim, n, u.id)) o.nodeId = -1;
     }
     return;
   }
 
   let node = sim.node(o.nodeId);
   if (!node) {
-    // O recurso acabou (ou era inalcançável): procura outro igual por perto.
-    node = findNearestNode(sim, o.nodeKind, o.tx, o.ty, BALANCE.units.nodeSearchRadius, o.avoid);
+    // O recurso acabou (ou era inalcançável): vai ao mais perto do depósito que ainda tem vaga.
+    node = pickNextNode(sim, u, o.nodeKind, o.tx, o.ty, o.avoid);
     if (!node) {
       if (u.carry && u.carry.amount > 0) {
         o.phase = 'drop';
@@ -312,9 +318,10 @@ function afterBuilding(sim: Sim, u: Unit, b: Building): void {
     const c = buildingCenter(sim, b);
     const tx = Math.floor(c.x / sim.tileSize);
     const ty = Math.floor(c.y / sim.tileSize);
-    let node = findNearestNode(sim, def.autoGather, tx, ty, radius);
+    const counts = gathererCounts(sim, u.id);
+    let node = findNearestNode(sim, def.autoGather, tx, ty, radius, [], counts);
     // Depósito de mineração também serve para ferro.
-    if (!node && b.kind === 'miningCamp') node = findNearestNode(sim, 'iron', tx, ty, radius);
+    if (!node && b.kind === 'miningCamp') node = findNearestNode(sim, 'iron', tx, ty, radius, [], counts);
     if (node) {
       setOrder(u, { type: 'gather', nodeId: node.id, nodeKind: node.kind, tx: node.tx, ty: node.ty, phase: 'collect', avoid: [] });
       return;
