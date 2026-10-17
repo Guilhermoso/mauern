@@ -63,12 +63,12 @@ export function moveTo(sim: Sim, u: Unit, goal: Goal): MoveResult {
 }
 
 // Anda um passo em direção ao ponto. Retorna true se chegou.
-function stepToward(u: Unit, x: number, y: number): boolean {
-  const step = UNIT_DEFS[u.kind].speed * DT;
+export function stepToward(u: { x: number; y: number; facing: number; moving?: boolean; kind?: string }, x: number, y: number, speed?: number): boolean {
+  const step = (speed ?? UNIT_DEFS[u.kind as Unit['kind']].speed) * DT;
   const dx = x - u.x;
   const dy = y - u.y;
   const d = Math.hypot(dx, dy);
-  u.moving = true;
+  if ('moving' in u) u.moving = true;
   if (d <= step) {
     u.x = x;
     u.y = y;
@@ -92,12 +92,14 @@ export function separateUnits(sim: Sim): void {
   const grid = new Map<number, Unit[]>();
   const key = (cx: number, cy: number) => cy * 4096 + cx;
   for (const u of sim.state.units) {
+    if (u.garrison) continue;
     const k = key(Math.floor(u.x / cell), Math.floor(u.y / cell));
     let list = grid.get(k);
     if (!list) grid.set(k, (list = []));
     list.push(u);
   }
   for (const u of sim.state.units) {
+    if (u.garrison) continue;
     const { tx, ty } = unitTile(sim, u);
     if (!sim.nav.isFree(tx, ty)) {
       pushOutOfBlocked(sim, u, tx, ty);
@@ -143,7 +145,7 @@ export function separateUnits(sim: Sim): void {
 }
 
 function isWorking(u: Unit): boolean {
-  return !u.moving && (u.order.type === 'gather' || u.order.type === 'farm' || u.order.type === 'build');
+  return !u.moving && (u.order.type === 'gather' || u.order.type === 'farm' || u.order.type === 'build' || u.order.type === 'attack');
 }
 
 function pushOutOfBlocked(sim: Sim, u: Unit, tx: number, ty: number): void {

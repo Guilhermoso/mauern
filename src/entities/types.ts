@@ -15,7 +15,16 @@ export interface ResourceNode {
   variant: number; // variação visual estável
 }
 
-export type BuildingKind = 'townCenter' | 'house' | 'lumberCamp' | 'miningCamp' | 'mill' | 'farm';
+export type BuildingKind =
+  | 'townCenter'
+  | 'house'
+  | 'lumberCamp'
+  | 'miningCamp'
+  | 'mill'
+  | 'farm'
+  | 'palisade'
+  | 'gate'
+  | 'watchTower';
 
 export interface TrainItem {
   kind: UnitKind;
@@ -39,9 +48,10 @@ export interface Building {
   queue: TrainItem[];
   rally: RallyPoint | null;
   farmerId: number; // fazendas: aldeão que trabalha nela (0 = nenhum)
+  attackCooldown: number; // segundos até a próxima flecha
 }
 
-export type UnitKind = 'villager' | 'scout';
+export type UnitKind = 'villager' | 'scout' | 'militia';
 
 export interface Carry {
   kind: ResourceKind;
@@ -57,7 +67,9 @@ export type UnitOrder =
   | { type: 'gather'; nodeId: number; nodeKind: ResourceNodeKind; tx: number; ty: number; phase: GatherPhase; avoid: number[] }
   | { type: 'farm'; buildingId: number; phase: GatherPhase }
   | { type: 'build'; buildingId: number }
-  | { type: 'deliver'; buildingId: number };
+  | { type: 'deliver'; buildingId: number }
+  | { type: 'attack'; titanId: number }
+  | { type: 'garrison'; buildingId: number };
 
 export interface Unit {
   id: number;
@@ -74,4 +86,37 @@ export interface Unit {
   carry: Carry | null;
   work: number; // acumulador de trabalho (coleta)
   moving: boolean;
+  garrison: number; // edifício onde está abrigada (0 = fora)
+  attackCooldown: number;
+  prevOrder: UnitOrder | null; // ordem a retomar quando o sino de alarme for desligado
+}
+
+export type TitanKind = 'common';
+
+export interface Titan {
+  id: number;
+  kind: TitanKind;
+  height: number; // em metros; define vida, dano, tamanho e velocidade
+  x: number;
+  y: number;
+  hp: number;
+  maxHp: number;
+  facing: number;
+  targetKind: 'unit' | 'building' | 'march' | 'none';
+  targetId: number;
+  path: number[];
+  pathKey: string;
+  repathTick: number; // não recalcula o caminho antes deste tick
+  retargetTick: number;
+  attackCooldown: number;
+  lastHitTick: number; // para o efeito visual de dano
+  sighted: boolean; // já foi anunciado ao jogador
+  skin: number; // variação de cor
+}
+
+export interface ThreatState {
+  nextSpawnTick: number;
+  nextGreatAttackDay: number;
+  greatAttackAnnounced: boolean;
+  greatAttackDir: number; // ângulo de onde vem a horda
 }

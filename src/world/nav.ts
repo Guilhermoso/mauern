@@ -28,6 +28,10 @@ export class NavGrid {
     return this.terrain[i] === 0 && this.occ[i] === 0;
   }
 
+  isTerrainWalkable(x: number, y: number): boolean {
+    return this.inBounds(x, y) && this.terrain[y * this.width + x] === 0;
+  }
+
   setTerrainWalkable(x: number, y: number, walkable: boolean): void {
     if (this.inBounds(x, y)) this.terrain[y * this.width + x] = walkable ? 0 : 1;
   }

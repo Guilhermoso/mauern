@@ -82,7 +82,9 @@ export class Minimap {
       const s = BUILDING_DEFS[b.kind].size;
       ctx.fillRect(b.tx, b.ty, s, s);
     }
-    for (const u of this.state.units) ctx.fillRect(u.x / ts - 1, u.y / ts - 1, 2, 2);
+    for (const u of this.state.units) if (!u.garrison) ctx.fillRect(u.x / ts - 1, u.y / ts - 1, 2, 2);
+    ctx.fillStyle = '#ff3b2f';
+    for (const t of this.state.titans) ctx.fillRect(t.x / ts - 1.5, t.y / ts - 1.5, 3, 3);
     const v = this.camera.viewRect();
     ctx.strokeStyle = '#ffffff';
     ctx.lineWidth = 1;

@@ -3,6 +3,8 @@ import { addLog } from '../state';
 import { getClock } from './time';
 import { updateUnits } from '../systems/units';
 import { updateProduction } from '../systems/production';
+import { updateThreat, updateTitans } from '../systems/titans';
+import { updateBuildingAttacks } from '../systems/combat';
 
 // Um passo fixo da simulação. Não depende da renderização.
 export function step(sim: Sim): void {
@@ -11,8 +13,11 @@ export function step(sim: Sim): void {
   state.tick++;
   const after = getClock(state.tick);
 
+  updateThreat(sim);
   updateProduction(sim);
   updateUnits(sim);
+  updateTitans(sim);
+  updateBuildingAttacks(sim);
   sim.syncRng();
 
   if (after.day !== before.day) {

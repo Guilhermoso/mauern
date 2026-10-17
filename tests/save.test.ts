@@ -55,8 +55,12 @@ describe('migrações', () => {
     for (const u of v1.units) {
       delete u.order; delete u.path; delete u.pathKey; delete u.pathComplete; delete u.carry; delete u.work; delete u.moving;
     }
+    delete v1.titans; delete v1.threat; delete v1.alarm;
     const migrated = deserialize(JSON.stringify(v1));
     expect(migrated.version).toBe(SAVE_VERSION);
+    expect(migrated.titans).toEqual([]);
+    expect(migrated.units[0].garrison).toBe(0);
+    expect(migrated.threat.nextSpawnTick).toBeGreaterThan(migrated.tick);
     expect(migrated.buildings[0].built).toBe(true);
     expect(migrated.units[0].order).toEqual({ type: 'idle' });
     // O jogo migrado roda normalmente.

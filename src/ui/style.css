@@ -107,7 +107,7 @@ button.danger:hover { background: #73302a; }
   gap: 6px;
   pointer-events: none !important;
 }
-.toast { padding: 8px 14px; font-size: 14px; animation: fade 4s forwards; }
+.toast { padding: 8px 14px; font-size: 14px; animation: fade 5s forwards; }
 @keyframes fade { 0%, 80% { opacity: 1; } 100% { opacity: 0; } }
 
 /* Menu */
@@ -153,7 +153,7 @@ button.danger:hover { background: #73302a; }
   padding: 10px 12px;
   font-size: 13px;
 }
-.bp-info { width: 240px; flex-shrink: 0; display: flex; flex-direction: column; gap: 3px; overflow: hidden; }
+.bp-info { width: 240px; flex-shrink: 0; display: flex; flex-direction: column; gap: 3px; overflow-y: auto; }
 .bp-title { font-size: 16px; font-weight: 600; color: var(--accent); }
 .bp-sub { color: var(--muted); }
 .bp-line.warn { color: #ff8a6a; }
@@ -175,6 +175,7 @@ button.danger:hover { background: #73302a; }
   text-align: left;
   font-size: 12px;
   line-height: 1.25;
+  padding-right: 22px;
 }
 .cmd .cmd-label { font-weight: 600; }
 .cmd .cmd-cost { color: var(--muted); font-size: 11px; }
@@ -190,3 +191,26 @@ button.danger:hover { background: #73302a; }
 }
 .cmd.disabled { opacity: 0.45; }
 .idle-btn.has-idle { background: #6b4a1e; border-color: var(--accent); }
+
+.cmd.active-alarm { background: #7a2a1e; border-color: #ff6b4a; }
+
+/* Faixa de pausa */
+.paused {
+  position: absolute;
+  top: 64px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 6px 18px;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 2px;
+  color: var(--accent);
+  pointer-events: none !important;
+}
+
+.toast.clickable { cursor: pointer; pointer-events: auto; }
+.toast.danger { border-color: var(--danger); }
+.topbar .threat { white-space: nowrap; color: var(--muted); }
+.topbar .threat.soon { color: #ff7b5c; font-weight: 600; }
+
+.gameover h2 { color: var(--danger); }

@@ -2,11 +2,11 @@ import { BALANCE } from './data/balance';
 import { Rng, hashString } from './core/rng';
 import { generateWorld } from './world/generate';
 import type { World } from './world/world';
-import type { Building, BuildingKind, Resources, Unit, UnitKind } from './entities/types';
+import type { Building, BuildingKind, Resources, ThreatState, Titan, Unit, UnitKind } from './entities/types';
 import { BUILDING_DEFS, UNIT_DEFS } from './data/defs';
 import { randomName } from './entities/names';
 
-export const SAVE_VERSION = 2;
+export const SAVE_VERSION = 3;
 
 export interface LogEntry {
   tick: number;
@@ -30,6 +30,9 @@ export interface GameState {
   world: World;
   buildings: Building[];
   units: Unit[];
+  titans: Titan[];
+  threat: ThreatState;
+  alarm: boolean; // sino de alarme tocando: aldeões abrigados
   nextId: number;
   camera: CameraState;
   log: LogEntry[];
@@ -70,6 +73,9 @@ export function createNewGame(seed: string): GameState {
     world,
     buildings,
     units,
+    titans: [],
+    threat: newThreat(),
+    alarm: false,
     nextId,
     camera: { x: centerX, y: centerY, zoom: 1 },
     log: [{ tick: 0, text: 'Um pequeno grupo de sobreviventes funda um refúgio. Que estas terras nos protejam.' }],
@@ -86,6 +92,19 @@ export function newBuilding(id: number, kind: BuildingKind, tx: number, ty: numb
     queue: [],
     rally: null,
     farmerId: 0,
+    attackCooldown: 0,
+  };
+}
+
+export function newThreat(): ThreatState {
+  const ticksPerHour = (BALANCE.time.ticksPerSecond * BALANCE.time.secondsPerDay) / 24;
+  // Primeiro titã: manhã do dia em que a ameaça começa.
+  const firstTick = Math.round(((BALANCE.titans.firstSpawnDay - 1) * 24 + 10 - BALANCE.time.startHour) * ticksPerHour);
+  return {
+    nextSpawnTick: firstTick,
+    nextGreatAttackDay: BALANCE.titans.greatAttackEveryDays,
+    greatAttackAnnounced: false,
+    greatAttackDir: 0,
   };
 }
 
@@ -101,6 +120,9 @@ export function newUnit(id: number, kind: UnitKind, name: string, x: number, y: 
     carry: null,
     work: 0,
     moving: false,
+    garrison: 0,
+    attackCooldown: 0,
+    prevOrder: null,
   };
 }
 

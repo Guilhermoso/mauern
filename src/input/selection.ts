@@ -3,14 +3,27 @@ import { BUILDING_DEFS, UNIT_DEFS, VILLAGER_BUILDS } from '../data/defs';
 import type { Sim } from '../core/sim';
 import type { BuildingKind } from '../entities/types';
 import type { Camera } from '../render/camera';
-import { canAfford, deleteEntity, placeBuilding, setRally, smartCommand, trainUnit } from '../systems/commands';
+import {
+  canAfford,
+  deleteEntity,
+  lineTiles,
+  placeBuilding,
+  placeWallLine,
+  setRally,
+  smartCommand,
+  titanAt,
+  trainUnit,
+} from '../systems/commands';
 import { idleVillagers } from '../systems/queries';
+import { ringAlarm, stopAlarm } from '../systems/combat';
+import { ungarrison } from '../systems/commands';
 import { setIdle } from '../systems/units';
 
 export interface Selection {
   units: number[];
   building: number | null;
   node: number | null;
+  titan: number | null;
 }
 
 export interface CommandMarker {
@@ -24,8 +37,9 @@ export interface CommandMarker {
 // grupos de controle, atalhos e modo de posicionamento de edifícios.
 // A seleção é estado da interface: não faz parte do save.
 export class SelectionController {
-  selection: Selection = { units: [], building: null, node: null };
+  selection: Selection = { units: [], building: null, node: null, titan: null };
   placing: BuildingKind | null = null;
+  wallStart: { tx: number; ty: number } | null = null; // início da linha de muralha sendo arrastada
   mouseScreen = { x: 0, y: 0 };
   dragStart: { x: number; y: number } | null = null;
   markers: CommandMarker[] = [];
@@ -60,6 +74,14 @@ export class SelectionController {
   }
 
   // Tile do canto superior esquerdo do edifício sendo posicionado (centrado no cursor).
+  // Tiles da muralha que seria construída (da âncora até o cursor).
+  wallPreview(): { tx: number; ty: number }[] {
+    if (!this.placing || !BUILDING_DEFS[this.placing].wall) return [];
+    const t = this.placementTile()!;
+    if (!this.wallStart) return [t];
+    return lineTiles(this.wallStart.tx, this.wallStart.ty, t.tx, t.ty);
+  }
+
   placementTile(): { tx: number; ty: number } | null {
     if (!this.placing) return null;
     const size = BUILDING_DEFS[this.placing].size;
@@ -78,7 +100,7 @@ export class SelectionController {
   }
 
   setSelection(sel: Partial<Selection>): void {
-    this.selection = { units: sel.units ?? [], building: sel.building ?? null, node: sel.node ?? null };
+    this.selection = { units: sel.units ?? [], building: sel.building ?? null, node: sel.node ?? null, titan: sel.titan ?? null };
     this.changed = true;
   }
 
@@ -96,8 +118,9 @@ export class SelectionController {
     const units = s.units.filter((id) => this.sim.unit(id));
     const building = s.building !== null && this.sim.building(s.building) ? s.building : null;
     const node = s.node !== null && this.sim.node(s.node) ? s.node : null;
-    if (units.length !== s.units.length || building !== s.building || node !== s.node) {
-      this.setSelection({ units, building, node });
+    const titan = s.titan !== null && this.sim.titan(s.titan) ? s.titan : null;
+    if (units.length !== s.units.length || building !== s.building || node !== s.node || titan !== s.titan) {
+      this.setSelection({ units, building, node, titan });
     }
     if (this.placing && this.selectedVillagers().length === 0) this.placing = null;
   }
@@ -109,18 +132,25 @@ export class SelectionController {
       return;
     }
     this.placing = kind;
+    this.wallStart = null;
+  }
+
+  cancelPlacing(): void {
+    this.placing = null;
+    this.wallStart = null;
   }
 
   private onDown(e: MouseEvent): void {
     if (e.button === 0) {
       if (this.placing) {
-        this.tryPlace(e.shiftKey);
+        if (BUILDING_DEFS[this.placing].wall) this.wallStart = this.placementTile();
+        else this.tryPlace(e.shiftKey);
         return;
       }
       this.dragStart = { x: e.clientX, y: e.clientY };
     } else if (e.button === 2) {
       if (this.placing) {
-        this.placing = null;
+        this.cancelPlacing();
         return;
       }
       this.issueRightClick();
@@ -128,11 +158,25 @@ export class SelectionController {
   }
 
   private onUp(e: MouseEvent): void {
+    if (e.button === 0 && this.placing && this.wallStart) {
+      this.placeWall(e.shiftKey);
+      return;
+    }
     if (e.button !== 0 || !this.dragStart) return;
     const rect = this.dragRect();
     this.dragStart = null;
     if (rect) this.boxSelect(rect, e.shiftKey);
     else this.clickSelect(e.shiftKey);
+  }
+
+  private placeWall(keepPlacing: boolean): void {
+    const kind = this.placing!;
+    const a = this.wallStart!;
+    const b = this.placementTile()!;
+    this.wallStart = null;
+    const n = placeWallLine(this.sim, kind, a.tx, a.ty, b.tx, b.ty, this.selectedVillagers());
+    if (n === 0) this.toast(canAfford(this.sim, BUILDING_DEFS[kind].cost) ? 'Não há onde construir aqui.' : 'Recursos insuficientes.');
+    if (!keepPlacing || !canAfford(this.sim, BUILDING_DEFS[kind].cost)) this.cancelPlacing();
   }
 
   private tryPlace(keepPlacing: boolean): void {
@@ -143,7 +187,7 @@ export class SelectionController {
       this.toast(error);
       return;
     }
-    if (!keepPlacing || !canAfford(this.sim, BUILDING_DEFS[kind].cost)) this.placing = null;
+    if (!keepPlacing || !canAfford(this.sim, BUILDING_DEFS[kind].cost)) this.cancelPlacing();
   }
 
   private issueRightClick(): void {
@@ -153,10 +197,11 @@ export class SelectionController {
     const ty = Math.floor(m.y / ts);
     const s = this.selection;
     if (s.units.length) {
-      const err = smartCommand(this.sim, s.units, tx, ty);
+      const err = smartCommand(this.sim, s.units, m.x, m.y);
       if (err) this.toast(err);
+      const enemy = titanAt(this.sim, m.x, m.y) !== null;
       const target = this.sim.nodeAt(tx, ty) ?? this.sim.buildingAt(tx, ty);
-      this.markers.push({ x: m.x, y: m.y, time: performance.now(), color: target ? 0xffd34d : 0x7cff6b });
+      this.markers.push({ x: m.x, y: m.y, time: performance.now(), color: enemy ? 0xff4a3a : target ? 0xffd34d : 0x7cff6b });
     } else if (s.building !== null) {
       const b = this.sim.building(s.building);
       if (b && BUILDING_DEFS[b.kind].trains.length) {
@@ -171,6 +216,7 @@ export class SelectionController {
     let bestD = Infinity;
     const slack = 6 / this.camera.zoom;
     for (const u of this.sim.state.units) {
+      if (u.garrison) continue;
       const r = UNIT_DEFS[u.kind].radius + slack;
       const d = Math.hypot(u.x - wx, u.y - wy);
       if (d <= r && d < bestD) {
@@ -207,6 +253,11 @@ export class SelectionController {
       return;
     }
     if (additive) return;
+    const titanId = titanAt(this.sim, m.x, m.y);
+    if (titanId !== null) {
+      this.setSelection({ titan: titanId });
+      return;
+    }
     const tx = Math.floor(m.x / ts);
     const ty = Math.floor(m.y / ts);
     const b = this.sim.buildingAt(tx, ty);
@@ -225,7 +276,7 @@ export class SelectionController {
   private boxSelect(rect: { x: number; y: number; w: number; h: number }, additive: boolean): void {
     const a = this.camera.screenToWorld(rect.x, rect.y);
     const b = this.camera.screenToWorld(rect.x + rect.w, rect.y + rect.h);
-    const inside = this.sim.state.units.filter((u) => u.x >= a.x && u.x <= b.x && u.y >= a.y && u.y <= b.y).map((u) => u.id);
+    const inside = this.sim.state.units.filter((u) => !u.garrison && u.x >= a.x && u.x <= b.x && u.y >= a.y && u.y <= b.y).map((u) => u.id);
     if (additive) {
       this.setSelection({ units: [...new Set([...this.selection.units, ...inside])] });
     } else if (inside.length) {
@@ -238,7 +289,7 @@ export class SelectionController {
   centerOnSelection(): void {
     const s = this.selection;
     const ts = BALANCE.world.tileSize;
-    const units = s.units.map((id) => this.sim.unit(id)).filter((u) => !!u);
+    const units = s.units.map((id) => this.sim.unit(id)).filter((u) => !!u && !u.garrison);
     if (units.length) {
       const x = units.reduce((sum, u) => sum + u!.x, 0) / units.length;
       const y = units.reduce((sum, u) => sum + u!.y, 0) / units.length;
@@ -253,7 +304,7 @@ export class SelectionController {
   }
 
   selectNextIdle(): void {
-    const idle = idleVillagers(this.sim);
+    const idle = idleVillagers(this.sim).filter((u) => !u.garrison);
     if (!idle.length) {
       this.toast('Nenhum aldeão ocioso.');
       return;
@@ -294,10 +345,10 @@ export class SelectionController {
     const s = this.selection;
     if (e.code === 'Escape') {
       if (this.placing) {
-        this.placing = null;
+        this.cancelPlacing();
         return true;
       }
-      if (s.units.length || s.building !== null || s.node !== null) {
+      if (s.units.length || s.building !== null || s.node !== null || s.titan !== null) {
         this.clear();
         return true;
       }
@@ -308,7 +359,7 @@ export class SelectionController {
       const d = Number(digit[1]);
       if (e.ctrlKey || e.metaKey) {
         e.preventDefault();
-        this.groups.set(d, { units: [...s.units], building: s.building, node: null });
+        this.groups.set(d, { units: [...s.units], building: s.building, node: null, titan: null });
         this.toast(`Grupo ${d} definido.`);
         return true;
       }
@@ -345,9 +396,18 @@ export class SelectionController {
         return true;
       }
     }
-    if (s.building !== null && e.code === 'KeyQ') {
+    if (s.building !== null && e.code === 'KeyU') {
+      ungarrison(this.sim, s.building);
+      return true;
+    }
+    if (s.building !== null && e.code === 'KeyB' && this.sim.building(s.building)?.kind === 'townCenter') {
+      if (this.sim.state.alarm) stopAlarm(this.sim);
+      else ringAlarm(this.sim);
+      return true;
+    }
+    if (s.building !== null) {
       const b = this.sim.building(s.building);
-      const kind = b && BUILDING_DEFS[b.kind].trains[0];
+      const kind = b && BUILDING_DEFS[b.kind].trains.find((k) => UNIT_DEFS[k].hotkey === e.code);
       if (b && kind) {
         const times = e.shiftKey ? 5 : 1;
         for (let i = 0; i < times; i++) {

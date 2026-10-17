@@ -21,16 +21,21 @@ export function goalKey(g: Goal): string {
   return `${g.x0},${g.y0},${g.x1},${g.y1},${g.adjacent ? 1 : 0}`;
 }
 
-export function satisfies(nav: NavGrid, g: Goal, x: number, y: number): boolean {
+// Custo de entrar num tile (1 = normal, Infinity = intransponível). Os titãs usam um custo próprio:
+// estruturas custam caro mas são "atravessáveis" (eles as derrubam).
+export type CostFn = (x: number, y: number) => number;
+
+export function satisfies(nav: NavGrid, g: Goal, x: number, y: number, cost?: CostFn): boolean {
+  const free = cost ? cost(x, y) < Infinity : nav.isFree(x, y);
   if (g.adjacent) {
-    if (!nav.isFree(x, y)) return false;
+    if (!free) return false;
     const inside = x >= g.x0 && x <= g.x1 && y >= g.y0 && y <= g.y1;
     if (inside) return false;
     const dx = Math.max(g.x0 - x, 0, x - g.x1);
     const dy = Math.max(g.y0 - y, 0, y - g.y1);
     return Math.max(dx, dy) <= 1;
   }
-  return x >= g.x0 && x <= g.x1 && y >= g.y0 && y <= g.y1 && nav.isFree(x, y);
+  return x >= g.x0 && x <= g.x1 && y >= g.y0 && y <= g.y1 && free;
 }
 
 function heuristic(g: Goal, x: number, y: number): number {
@@ -61,13 +66,16 @@ function ensure(n: number): void {
   search = 0;
 }
 
+const DIAGONAL_MAX_COST = 3;
+
 const DIRS = [
   [1, 0, 1], [-1, 0, 1], [0, 1, 1], [0, -1, 1],
   [1, 1, Math.SQRT2], [1, -1, Math.SQRT2], [-1, 1, Math.SQRT2], [-1, -1, Math.SQRT2],
 ] as const;
 
-export function findPath(nav: NavGrid, sx: number, sy: number, goal: Goal, maxExpand = 40000): PathResult {
+export function findPath(nav: NavGrid, sx: number, sy: number, goal: Goal, maxExpand = 40000, cost?: CostFn): PathResult {
   const w = nav.width;
+  const tileCost: CostFn = cost ?? ((x, y) => (nav.isFree(x, y) ? 1 : Infinity));
   ensure(nav.width * nav.height);
   search++;
   if (search === 0xffffffff) {
@@ -75,7 +83,7 @@ export function findPath(nav: NavGrid, sx: number, sy: number, goal: Goal, maxEx
     closed.fill(0);
     search = 1;
   }
-  if (satisfies(nav, goal, sx, sy)) return { tiles: [], complete: true };
+  if (satisfies(nav, goal, sx, sy, cost)) return { tiles: [], complete: true };
 
   const start = sy * w + sx;
   let heapLen = 0;
@@ -123,21 +131,23 @@ export function findPath(nav: NavGrid, sx: number, sy: number, goal: Goal, maxEx
     expanded++;
     const cx = cur % w;
     const cy = (cur - cx) / w;
-    if (satisfies(nav, goal, cx, cy)) return { tiles: reconstruct(cur), complete: true };
+    if (satisfies(nav, goal, cx, cy, cost)) return { tiles: reconstruct(cur), complete: true };
     const h = heuristic(goal, cx, cy);
     if (h < bestH) {
       bestH = h;
       best = cur;
     }
-    for (const [dx, dy, cost] of DIRS) {
+    for (const [dx, dy, dist] of DIRS) {
       const nx = cx + dx;
       const ny = cy + dy;
-      if (!nav.isFree(nx, ny)) continue;
-      // Movimento diagonal só se os dois vizinhos ortogonais estiverem livres.
-      if (dx !== 0 && dy !== 0 && (!nav.isFree(cx + dx, cy) || !nav.isFree(cx, cy + dy))) continue;
+      const c = tileCost(nx, ny);
+      if (c === Infinity) continue;
+      // Movimento diagonal só se os dois vizinhos ortogonais forem fáceis de atravessar
+      // (assim nem humanos nem titãs passam entre dois segmentos de muralha na diagonal).
+      if (dx !== 0 && dy !== 0 && (tileCost(cx + dx, cy) > DIAGONAL_MAX_COST || tileCost(cx, cy + dy) > DIAGONAL_MAX_COST)) continue;
       const ni = ny * w + nx;
       if (closed[ni] === search) continue;
-      const g = gScore[cur] + cost;
+      const g = gScore[cur] + dist * c;
       if (stamp[ni] !== search || g < gScore[ni]) {
         stamp[ni] = search;
         gScore[ni] = g;

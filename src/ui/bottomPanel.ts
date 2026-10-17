@@ -1,9 +1,12 @@
-import { BUILDING_DEFS, NODE_DEFS, RESOURCE_NAMES, UNIT_DEFS, VILLAGER_BUILDS, formatCost } from '../data/defs';
+import { BUILDING_DEFS, NODE_DEFS, RESOURCE_NAMES, UNIT_DEFS, VILLAGER_BUILDS, formatCost, unitNoun } from '../data/defs';
+import { isFemaleName } from '../entities/names';
 import type { Sim } from '../core/sim';
 import type { SelectionController } from '../input/selection';
 import { populationCap } from '../state';
-import { canAfford, cancelTrain, trainUnit } from '../systems/commands';
+import { canAfford, cancelTrain, trainUnit, ungarrison } from '../systems/commands';
 import { unitStatus } from '../systems/units';
+import { garrisonCount } from '../systems/damage';
+import { ringAlarm, stopAlarm } from '../systems/combat';
 import type { Unit, UnitKind } from '../entities/types';
 
 // Painel inferior: informações do que está selecionado e botões de comando.
@@ -41,9 +44,10 @@ export class BottomPanel {
     }
     if (s.building !== null) {
       const b = this.sim.building(s.building);
-      return b ? `b:${b.id}:${b.built}:${b.queue.length}` : '';
+      return b ? `b:${b.id}:${b.built}:${b.queue.length}:${garrisonCount(this.sim, b) > 0}:${this.sim.state.alarm}` : '';
     }
     if (s.node !== null) return `n:${s.node}`;
+    if (s.titan !== null) return `t:${s.titan}`;
     return '';
   }
 
@@ -56,6 +60,23 @@ export class BottomPanel {
     if (s.units.length) this.buildUnits(s.units);
     else if (s.building !== null) this.buildBuilding(s.building);
     else if (s.node !== null) this.buildNode(s.node);
+    else if (s.titan !== null) this.buildTitan(s.titan);
+  }
+
+  private buildTitan(id: number): void {
+    const t = this.sim.titan(id);
+    if (!t) return;
+    this.info.append(el('div', 'bp-title', 'Titã'));
+    this.info.append(el('div', 'bp-sub', `${t.height.toFixed(1).replace('.', ',')} metros de altura`));
+    const hp = el('div', 'bp-line');
+    const status = el('div', 'bp-line');
+    this.info.append(hp, status);
+    this.updaters.push(() => {
+      hp.textContent = `Vida: ${Math.ceil(t.hp)}/${t.maxHp}`;
+      status.textContent =
+        t.targetKind === 'unit' ? 'Caçando humanos' : t.targetKind === 'building' ? 'Destruindo construções' : t.targetKind === 'march' ? 'Marchando para a cidade' : 'Vagando';
+    });
+    this.info.append(el('div', 'bp-hint', 'Selecione soldados e clique com o botão direito no titã para atacar. Torres e o Centro da Vila (com gente dentro) atiram flechas.'));
   }
 
   private buildUnits(ids: number[]): void {
@@ -64,7 +85,7 @@ export class BottomPanel {
       const u = units[0];
       const def = UNIT_DEFS[u.kind];
       const title = el('div', 'bp-title', u.name);
-      const sub = el('div', 'bp-sub', def.name);
+      const sub = el('div', 'bp-sub', unitNoun(u.kind, isFemaleName(u.name)));
       const hp = el('div', 'bp-line');
       const status = el('div', 'bp-line');
       this.info.append(title, sub, hp, status);
@@ -79,11 +100,13 @@ export class BottomPanel {
       for (const [kind, n] of counts) this.info.append(el('div', 'bp-line', `${n}× ${UNIT_DEFS[kind].name}`));
     }
 
+    this.info.append(el('div', 'bp-hint', 'Clique direito: andar, coletar, construir, reparar, abrigar ou atacar.'));
     if (units.some((u) => u.kind === 'villager')) {
       for (const kind of VILLAGER_BUILDS) {
         const def = BUILDING_DEFS[kind];
         const letter = def.hotkey?.replace('Key', '') ?? '';
-        const b = cmdButton(def.name, formatCost(def.cost), letter, `${def.name}: ${def.description}`, () => this.sel.startPlacing(kind));
+        const label = def.wall ? `${def.name} (por segmento)` : def.name;
+        const b = cmdButton(label, formatCost(def.cost), letter, `${def.name}: ${def.description}`, () => this.sel.startPlacing(kind));
         this.commands.appendChild(b);
         this.updaters.push(() => b.classList.toggle('disabled', !canAfford(this.sim, def.cost)));
       }
@@ -116,6 +139,29 @@ export class BottomPanel {
     }
 
     this.info.append(el('div', 'bp-sub', def.description));
+    const dmg = el('div', 'bp-hint');
+    this.info.append(dmg);
+    this.updaters.push(() => (dmg.textContent = b.hp < def.maxHp ? 'Danificado: aldeões podem reparar (botão direito).' : ''));
+    if (def.garrison > 0) {
+      const g = el('div', 'bp-line');
+      this.info.append(g);
+      this.updaters.push(() => (g.textContent = `Abrigados: ${garrisonCount(this.sim, b)}/${def.garrison}`));
+      if (garrisonCount(this.sim, b) > 0) {
+        this.commands.appendChild(cmdButton('Liberar abrigados', '', 'U', 'Todos saem do edifício', () => ungarrison(this.sim, b.id)));
+      }
+    }
+    if (b.kind === 'townCenter') {
+      const alarm = this.sim.state.alarm;
+      const bellBtn = cmdButton(
+        alarm ? 'Desligar o sino' : 'Tocar o sino',
+        alarm ? 'todos voltam ao trabalho' : 'aldeões se abrigam',
+        'B',
+        alarm ? 'Fim do alarme: os aldeões saem e retomam o que faziam.' : 'Sino de alarme: os aldeões correm para o Centro da Vila e as torres.',
+        () => (this.sim.state.alarm ? stopAlarm(this.sim) : ringAlarm(this.sim)),
+      );
+      if (alarm) bellBtn.classList.add('active-alarm');
+      this.commands.appendChild(bellBtn);
+    }
     if (def.dropsite.length && b.kind !== 'townCenter') {
       this.info.append(el('div', 'bp-line', `Recebe: ${def.dropsite.map((r) => RESOURCE_NAMES[r].toLowerCase()).join(', ')}`));
     }
@@ -131,7 +177,8 @@ export class BottomPanel {
 
     for (const kind of def.trains) {
       const udef = UNIT_DEFS[kind];
-      const btn = cmdButton(`Treinar ${udef.name.toLowerCase()}`, formatCost(udef.cost), 'Q', `${udef.name} (${udef.trainTime}s). Shift+Q treina 5.`, () => {
+      const key = udef.hotkey.replace('Key', '');
+      const btn = cmdButton(`Treinar ${udef.name.toLowerCase()}`, formatCost(udef.cost), key, `${udef.name} (${udef.trainTime}s). Shift+${key} treina 5.`, () => {
         const err = trainUnit(this.sim, b.id, kind);
         if (err) this.toast(err);
       });

@@ -27,6 +27,8 @@ export class Hud {
   private idleBtn = document.createElement('button');
   private seasonEl!: HTMLElement;
   private clockEl!: HTMLElement;
+  private threatEl = document.createElement('div');
+  readonly paused = document.createElement('div');
   private speedBtns: HTMLButtonElement[] = [];
   private lastLogLength = -1;
   private lastLogTick = -1;
@@ -64,7 +66,11 @@ export class Hud {
     this.seasonEl = document.createElement('div');
     this.clockEl = document.createElement('div');
     this.clockEl.className = 'clock';
-    this.topbar.append(era, this.seasonEl, this.clockEl);
+    this.threatEl.className = 'threat';
+    this.threatEl.title = 'Próximo Grande Ataque de titãs';
+    this.topbar.append(era, this.threatEl, this.seasonEl, this.clockEl);
+    this.paused.className = 'paused panel hidden';
+    this.paused.textContent = 'PAUSADO — Espaço para continuar';
 
     const speeds = document.createElement('div');
     speeds.className = 'speeds';
@@ -99,6 +105,11 @@ export class Hud {
     this.seasonEl.textContent = `${clock.season}, ano ${clock.year}`;
     this.clockEl.textContent = `Dia ${clock.day} · ${formatClock(clock)}`;
 
+    const th = state.threat;
+    this.threatEl.textContent = th.greatAttackAnnounced ? 'Grande Ataque amanhã!' : `Grande Ataque: dia ${th.nextGreatAttackDay}`;
+    this.threatEl.classList.toggle('soon', th.greatAttackAnnounced || th.nextGreatAttackDay === clock.day);
+    if (th.nextGreatAttackDay === clock.day) this.threatEl.textContent = 'Grande Ataque hoje!';
+
     if (state.speed !== this.lastSpeed) {
       this.lastSpeed = state.speed;
       for (const b of this.speedBtns) b.classList.toggle('active', Number(b.dataset.speed) === state.speed);
@@ -127,11 +138,26 @@ export class Hud {
     this.log.scrollTop = this.log.scrollHeight;
   }
 
-  toast(text: string): void {
+  setPaused(paused: boolean): void {
+    this.paused.classList.toggle('hidden', !paused);
+  }
+
+  // Notificação passageira. Com onClick, clicar nela leva a câmera ao local do evento.
+  toast(text: string, onClick?: () => void, danger = false): void {
     const t = document.createElement('div');
     t.className = 'toast panel';
+    if (danger) t.classList.add('danger');
     t.textContent = text;
+    if (onClick) {
+      t.classList.add('clickable');
+      t.title = 'Clique para ver';
+      t.onclick = () => {
+        onClick();
+        t.remove();
+      };
+    }
     this.toasts.appendChild(t);
-    setTimeout(() => t.remove(), 4000);
+    while (this.toasts.children.length > 4) this.toasts.firstChild!.remove();
+    setTimeout(() => t.remove(), 5000);
   }
 }

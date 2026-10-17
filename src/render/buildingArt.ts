@@ -12,10 +12,22 @@ export interface BuildingArt {
   blades?: Graphics;
 }
 
-export function drawBuildingArt(kind: BuildingKind, built: boolean, progress01: number): BuildingArt {
+// Vizinhos de muralha (para os troncos da paliçada se ligarem): bits N, L, S, O, NE, SE, SO, NO.
+export const NEIGHBOR_DIRS = [
+  [0, -1], [1, 0], [0, 1], [-1, 0], [1, -1], [1, 1], [-1, 1], [-1, -1],
+] as const;
+
+export function drawBuildingArt(kind: BuildingKind, built: boolean, progress01: number, mask = 0): BuildingArt {
   const ts = BALANCE.world.tileSize;
   const size = BUILDING_DEFS[kind].size * ts;
   const root = new Container();
+  const def = BUILDING_DEFS[kind];
+
+  if (def.wall || def.gate) {
+    const art = def.wall ? drawPalisade(mask, ts) : drawGate(mask, ts);
+    if (!built) art.root.alpha = 0.3 + 0.5 * progress01;
+    return art;
+  }
 
   if (!built) {
     const g = new Graphics();
@@ -40,6 +52,61 @@ export function drawBuildingArt(kind: BuildingKind, built: boolean, progress01: 
     return { root };
   }
   return drawFinished(kind, size);
+}
+
+function logRow(g: Graphics, x0: number, y0: number, x1: number, y1: number): void {
+  const len = Math.hypot(x1 - x0, y1 - y0);
+  const n = Math.max(1, Math.round(len / 5));
+  for (let i = 0; i <= n; i++) {
+    const x = x0 + ((x1 - x0) * i) / n;
+    const y = y0 + ((y1 - y0) * i) / n;
+    g.circle(x + 2, y + 3, 4.6).fill({ color: 0x000000, alpha: 0.18 });
+  }
+  for (let i = 0; i <= n; i++) {
+    const x = x0 + ((x1 - x0) * i) / n;
+    const y = y0 + ((y1 - y0) * i) / n;
+    g.circle(x, y, 4.6).fill(0x7a5230).stroke({ width: 1, color: 0x4a301a });
+    g.circle(x - 0.8, y - 0.8, 2.2).fill(0xb3854f);
+  }
+}
+
+// Paliçada vista de cima: fileiras de topos de troncos ligando o centro aos vizinhos.
+function drawPalisade(mask: number, ts: number): BuildingArt {
+  const root = new Container();
+  const g = new Graphics();
+  root.addChild(g);
+  const c = ts / 2;
+  let any = false;
+  NEIGHBOR_DIRS.forEach(([dx, dy], i) => {
+    if (!(mask & (1 << i))) return;
+    // Diagonais só se não houver ligação ortogonal fazendo o mesmo caminho.
+    if (i >= 4 && (mask & (1 << (dy < 0 ? 0 : 2)) || mask & (1 << (dx > 0 ? 1 : 3)))) return;
+    any = true;
+    logRow(g, c, c, c + dx * c, c + dy * c);
+  });
+  if (!any) logRow(g, c - 6, c, c + 6, c);
+  return { root };
+}
+
+// Portão: dois pilares e folhas de madeira, na direção da muralha.
+function drawGate(mask: number, ts: number): BuildingArt {
+  const root = new Container();
+  const g = new Graphics();
+  root.addChild(g);
+  const vertical = (mask & 0b0101) !== 0 && (mask & 0b1010) === 0;
+  const post = 0x8e8172;
+  if (vertical) {
+    g.rect(ts / 2 - 7, 0, 14, ts).fill(0x6b4a2a);
+    for (let y = 3; y < ts; y += 5) g.rect(ts / 2 - 7, y, 14, 1.2).fill(0x4a301a);
+    g.rect(ts / 2 - 8, -3, 16, 7).fill(post);
+    g.rect(ts / 2 - 8, ts - 4, 16, 7).fill(post);
+  } else {
+    g.rect(0, ts / 2 - 7, ts, 14).fill(0x6b4a2a);
+    for (let x = 3; x < ts; x += 5) g.rect(x, ts / 2 - 7, 1.2, 14).fill(0x4a301a);
+    g.rect(-3, ts / 2 - 8, 7, 16).fill(post);
+    g.rect(ts - 4, ts / 2 - 8, 7, 16).fill(post);
+  }
+  return { root };
 }
 
 function shadow(g: Graphics, size: number, off = 8): void {
@@ -137,6 +204,24 @@ function drawFinished(kind: BuildingKind, size: number): BuildingArt {
       root.addChild(blades);
       return { root, blades };
     }
+    case 'watchTower': {
+      shadow(g, size - 10, 12);
+      g.rect(6, 6, size - 12, size - 12).fill(0x7d7468);
+      g.rect(10, 10, size - 20, size - 20).fill(0x6b4a2a);
+      // Telhado em pirâmide
+      const roof = 0x5a3b26;
+      const m = 8;
+      g.poly([m, m, size - m, m, size / 2, size / 2]).fill(shade(roof, 1.25));
+      g.poly([size - m, m, size - m, size - m, size / 2, size / 2]).fill(shade(roof, 0.95));
+      g.poly([size - m, size - m, m, size - m, size / 2, size / 2]).fill(shade(roof, 0.75));
+      g.poly([m, size - m, m, m, size / 2, size / 2]).fill(shade(roof, 1.05));
+      g.rect(size / 2 - 1, size / 2 - 20, 2, 20).fill(0x3a2e22);
+      g.poly([size / 2 + 1, size / 2 - 20, size / 2 + 12, size / 2 - 17, size / 2 + 1, size / 2 - 14]).fill(PLAYER_COLOR);
+      break;
+    }
+    case 'palisade':
+    case 'gate':
+      break;
     case 'farm': {
       g.rect(1, 1, size - 2, size - 2).fill(0x7b5a36);
       for (let y = 6; y < size - 4; y += 8) {

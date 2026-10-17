@@ -28,6 +28,26 @@ const MIGRATIONS: Record<number, Migration> = {
       moving: false,
     })),
   }),
+  // v2 → v3: titãs, ameaça, combate, guarnição e sino de alarme.
+  2: (save) => {
+    const ticksPerHour = (20 * 240) / 24;
+    const day = Math.floor((save.tick + 7 * ticksPerHour) / (ticksPerHour * 24)) + 1;
+    return {
+      ...save,
+      version: 3,
+      titans: [],
+      alarm: false,
+      // Cidades já existentes ganham um dia de calma antes do primeiro titã.
+      threat: {
+        nextSpawnTick: save.tick + ticksPerHour * 24,
+        nextGreatAttackDay: Math.max(7, Math.ceil((day + 3) / 7) * 7),
+        greatAttackAnnounced: false,
+        greatAttackDir: 0,
+      },
+      buildings: save.buildings.map((b: any) => ({ ...b, attackCooldown: 0 })),
+      units: save.units.map((u: any) => ({ ...u, garrison: 0, attackCooldown: 0, prevOrder: null })),
+    };
+  },
 };
 
 export function migrate(save: any): GameState {

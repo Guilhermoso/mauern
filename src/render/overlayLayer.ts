@@ -4,6 +4,7 @@ import { BUILDING_DEFS, UNIT_DEFS } from '../data/defs';
 import type { Sim } from '../core/sim';
 import type { SelectionController } from '../input/selection';
 import { canAfford, canPlace } from '../systems/commands';
+import { titanRadius } from '../systems/damage';
 import { drawBuildingArt } from './buildingArt';
 
 // Marcadores de interface no mundo: seleção, barras de vida, progresso de construção,
@@ -56,6 +57,14 @@ export class OverlayLayer {
       if (!b.built) bar(g, x + size / 2 - 24, y + size / 2 - 3, 48, b.progress / def.buildTime, 0xe0b43c);
     }
 
+    // Titãs: barra de vida quando feridos ou selecionados.
+    for (const t of sim.state.titans) {
+      const r = titanRadius(t.height);
+      const selected = s.titan === t.id;
+      if (selected) under.ellipse(t.x, t.y + 4, r + 8, (r + 8) * 0.7).stroke({ width: line * 1.4, color: 0xff4a3a });
+      if (selected || t.hp < t.maxHp) bar(g, t.x - r, t.y - r - 12, r * 2, t.hp / t.maxHp, 0xd94a3a);
+    }
+
     if (s.node !== null) {
       const n = sim.node(s.node);
       if (n) under.circle((n.tx + 0.5) * ts, (n.ty + 0.5) * ts, 18).stroke({ width: line, color: 0xffd34d });
@@ -63,7 +72,21 @@ export class OverlayLayer {
 
     // Prévia do edifício a construir.
     const pt = sel.placementTile();
-    if (sel.placing && pt) {
+    const wall = sel.placing ? BUILDING_DEFS[sel.placing].wall : false;
+    if (sel.placing && pt && wall) {
+      // Linha de muralha: cada segmento verde (pode) ou vermelho (não pode).
+      if (this.ghost) this.ghost.root.visible = false;
+      const cost = BUILDING_DEFS[sel.placing].cost;
+      let budget = Math.floor(sim.state.resources.wood / (cost.wood ?? 1));
+      for (const t of sel.wallPreview()) {
+        const blocked = canPlace(sim, sel.placing, t.tx, t.ty);
+        const existing = blocked && sim.buildingAt(t.tx, t.ty)?.kind === sel.placing;
+        const ok = !blocked && budget > 0;
+        if (ok) budget--;
+        const color = existing ? 0x999999 : ok ? 0x5bd34a : 0xe0443a;
+        g.rect(t.tx * ts + 3, t.ty * ts + 3, ts - 6, ts - 6).fill({ color, alpha: 0.35 }).stroke({ width: line, color });
+      }
+    } else if (sel.placing && pt) {
       if (!this.ghost || this.ghost.kind !== sel.placing) {
         this.ghost?.root.destroy({ children: true });
         const art = drawBuildingArt(sel.placing, true, 1);
@@ -75,6 +98,7 @@ export class OverlayLayer {
       this.ghost.root.position.set(pt.tx * ts, pt.ty * ts);
       this.ghost.root.visible = true;
       const ok = !canPlace(sim, sel.placing, pt.tx, pt.ty) && canAfford(sim, BUILDING_DEFS[sel.placing].cost);
+      this.ghost.root.alpha = BUILDING_DEFS[sel.placing].gate ? 0.9 : 0.6;
       const color = ok ? 0x5bd34a : 0xe0443a;
       g.rect(pt.tx * ts, pt.ty * ts, size, size).fill({ color, alpha: 0.25 }).stroke({ width: line * 1.5, color });
     } else if (this.ghost) {

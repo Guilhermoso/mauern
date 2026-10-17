@@ -1,10 +1,12 @@
 import { BALANCE } from '../data/balance';
 import { BUILDING_DEFS, FARM_GATHER_RATE, NODE_DEFS, UNIT_DEFS, buildingMessage } from '../data/defs';
 import type { Sim } from '../core/sim';
+import { isFemaleName } from '../entities/names';
 import { addLog } from '../state';
 import type { Building, Unit, UnitOrder } from '../entities/types';
 import type { Goal } from '../world/pathfinding';
 import { clearPath, face, moveTo, separateUnits } from './movement';
+import { autoAcquire, updateAttack, updateGarrisonOrder } from './combat';
 import {
   buildingCenter,
   findFreeFarm,
@@ -32,11 +34,23 @@ export function setIdle(u: Unit): void {
 }
 
 export function updateUnits(sim: Sim): void {
-  for (const u of sim.state.units) {
+  for (const u of [...sim.state.units]) {
+    if (u.garrison) continue;
+    if (u.attackCooldown > 0) u.attackCooldown -= DT;
     const o = u.order;
     switch (o.type) {
       case 'idle':
         u.moving = false;
+        autoAcquire(sim, u);
+        break;
+      case 'attack':
+        if (!updateAttack(sim, u, o)) {
+          setIdle(u);
+          autoAcquire(sim, u);
+        }
+        break;
+      case 'garrison':
+        if (!updateGarrisonOrder(sim, u, o) && !u.garrison) setIdle(u);
         break;
       case 'move':
         if (moveTo(sim, u, { x0: o.tx, y0: o.ty, x1: o.tx, y1: o.ty, adjacent: false }) !== 'moving') setIdle(u);
@@ -214,7 +228,8 @@ function updateBuild(sim: Sim, u: Unit, buildingId: number): void {
     setIdle(u);
     return;
   }
-  if (b.built) {
+  const def = BUILDING_DEFS[b.kind];
+  if (b.built && b.hp >= def.maxHp) {
     afterBuilding(sim, u, b);
     return;
   }
@@ -226,7 +241,11 @@ function updateBuild(sim: Sim, u: Unit, buildingId: number): void {
   if (r === 'moving') return;
   const c = buildingCenter(sim, b);
   face(u, c.x, c.y);
-  const def = BUILDING_DEFS[b.kind];
+  if (b.built) {
+    // Reparo: devolve a vida aos poucos, sem custo.
+    b.hp = Math.min(def.maxHp, b.hp + (def.maxHp / def.buildTime) * BALANCE.combat.repairRateFactor * DT);
+    return;
+  }
   b.progress = Math.min(def.buildTime, b.progress + DT);
   b.hp = Math.max(1, Math.round(def.maxHp * (b.progress / def.buildTime)));
   if (b.progress >= def.buildTime) completeBuilding(sim, b);
@@ -234,8 +253,10 @@ function updateBuild(sim: Sim, u: Unit, buildingId: number): void {
 
 export function completeBuilding(sim: Sim, b: Building): void {
   b.built = true;
-  b.hp = BUILDING_DEFS[b.kind].maxHp;
-  addLog(sim.state, buildingMessage(BUILDING_DEFS[b.kind], 'concluído', 'concluída'));
+  const def = BUILDING_DEFS[b.kind];
+  b.hp = def.maxHp;
+  // Segmentos de muralha não vão para o diário, um por um.
+  if (!def.wall) addLog(sim.state, buildingMessage(def, 'concluído', 'concluída'));
 }
 
 // O que o construtor faz ao terminar: coleta o recurso do depósito, trabalha na fazenda,
@@ -277,6 +298,10 @@ function afterBuilding(sim: Sim, u: Unit, b: Building): void {
 }
 
 export function unitStatus(sim: Sim, u: Unit): string {
+  if (u.garrison) {
+    const b = sim.building(u.garrison);
+    return `${isFemaleName(u.name) ? 'Abrigada' : 'Abrigado'} ${b ? `em ${BUILDING_DEFS[b.kind].name.toLowerCase()}` : ''}`;
+  }
   const o = u.order;
   const carrying = u.carry ? ` (carregando ${u.carry.amount})` : '';
   switch (o.type) {
@@ -293,10 +318,16 @@ export function unitStatus(sim: Sim, u: Unit): string {
       return o.phase === 'drop' ? `Levando comida ao depósito${carrying}` : `Trabalhando na fazenda${carrying}`;
     case 'build': {
       const b = sim.building(o.buildingId);
-      return b ? `${u.moving ? 'Indo construir' : 'Construindo'} ${BUILDING_DEFS[b.kind].name.toLowerCase()}` : 'Construindo';
+      if (!b) return 'Construindo';
+      const verb = b.built ? (u.moving ? 'Indo reparar' : 'Reparando') : u.moving ? 'Indo construir' : 'Construindo';
+      return `${verb} ${BUILDING_DEFS[b.kind].name.toLowerCase()}`;
     }
     case 'deliver':
       return `Entregando recursos${carrying}`;
+    case 'attack':
+      return u.moving ? 'Avançando contra um titã' : 'Lutando contra um titã';
+    case 'garrison':
+      return 'Indo se abrigar';
   }
 }
 

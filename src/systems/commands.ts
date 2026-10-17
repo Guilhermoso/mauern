@@ -6,7 +6,8 @@ import type { Building, BuildingKind, ResourceKind, Unit, UnitKind } from '../en
 import { TILE_INFO } from '../world/terrain';
 import { getTile } from '../world/world';
 import { farmTaken } from './queries';
-import { setIdle, setOrder } from './units';
+import { setOrder } from './units';
+import { ejectGarrison, removeBuilding, titanRadius } from './damage';
 
 // Comandos do jogador. A interface chama estas funções; elas validam e alteram o estado.
 // Retornam uma mensagem de erro (string) quando o comando não pode ser executado.
@@ -104,25 +105,77 @@ export function commandDeliver(sim: Sim, ids: readonly number[], buildingId: num
   }
 }
 
-// Comando do botão direito: decide a ação conforme o que está sob o cursor.
-export function smartCommand(sim: Sim, ids: readonly number[], tx: number, ty: number): string | null {
+export function commandAttack(sim: Sim, ids: readonly number[], titanId: number): void {
+  for (const u of units(sim, ids)) setOrder(u, { type: 'attack', titanId });
+}
+
+export function commandGarrison(sim: Sim, ids: readonly number[], buildingId: number): string | null {
+  const b = sim.building(buildingId);
+  if (!b || !b.built) return 'Edifício indisponível.';
+  const def = BUILDING_DEFS[b.kind];
+  if (def.garrison === 0) return 'Este edifício não abriga unidades.';
+  for (const u of units(sim, ids)) setOrder(u, { type: 'garrison', buildingId });
+  return null;
+}
+
+export function ungarrison(sim: Sim, buildingId: number): void {
+  const b = sim.building(buildingId);
+  if (b) for (const u of ejectGarrison(sim, b)) u.prevOrder = null;
+}
+
+// Titã sob o ponto (em pixels de mundo), se houver.
+export function titanAt(sim: Sim, wx: number, wy: number, slack = 4): number | null {
+  let best: number | null = null;
+  let bestD = Infinity;
+  for (const t of sim.state.titans) {
+    const d = Math.hypot(t.x - wx, t.y - wy);
+    if (d <= titanRadius(t.height) + slack && d < bestD) {
+      bestD = d;
+      best = t.id;
+    }
+  }
+  return best;
+}
+
+// Comando do botão direito: decide a ação conforme o que está sob o cursor (pixels de mundo).
+export function smartCommand(sim: Sim, ids: readonly number[], wx: number, wy: number): string | null {
   if (ids.length === 0) return null;
+  const ts = sim.tileSize;
+  const tx = Math.floor(wx / ts);
+  const ty = Math.floor(wy / ts);
+
+  const titanId = titanAt(sim, wx, wy);
+  if (titanId !== null) {
+    commandAttack(sim, ids, titanId);
+    return null;
+  }
+
   const node = sim.nodeAt(tx, ty);
   if (node) return commandGather(sim, ids, node.id);
 
   const b = sim.buildingAt(tx, ty);
   if (b) {
-    const builders = units(sim, ids).filter((u) => UNIT_DEFS[u.kind].canBuild);
-    const others = units(sim, ids).filter((u) => !UNIT_DEFS[u.kind].canBuild).map((u) => u.id);
-    if (others.length) commandMove(sim, others, tx, ty);
+    const def = BUILDING_DEFS[b.kind];
+    const list = units(sim, ids);
+    const builders = list.filter((u) => UNIT_DEFS[u.kind].canBuild);
+    const others = list.filter((u) => !UNIT_DEFS[u.kind].canBuild).map((u) => u.id);
     const bIds = builders.map((u) => u.id);
-    if (!b.built) commandBuild(sim, bIds, b.id);
+    // Militares: abrigam-se em torres e no Centro da Vila; senão, só andam até lá.
+    if (others.length) {
+      if (b.built && def.garrison > 0) commandGarrison(sim, others, b.id);
+      else commandMove(sim, others, tx, ty);
+    }
+    if (!builders.length) return null;
+    if (!b.built || b.hp < def.maxHp) commandBuild(sim, bIds, b.id);
     else if (b.kind === 'farm') commandFarm(sim, bIds, b.id);
     else {
-      const carrying = builders.filter((u) => u.carry && BUILDING_DEFS[b.kind].dropsite.includes(u.carry.kind));
+      const carrying = builders.filter((u) => u.carry && def.dropsite.includes(u.carry.kind));
       commandDeliver(sim, carrying.map((u) => u.id), b.id);
       const rest = builders.filter((u) => !carrying.includes(u)).map((u) => u.id);
-      if (rest.length) commandMove(sim, rest, tx, ty);
+      if (rest.length) {
+        if (def.garrison > 0) commandGarrison(sim, rest, b.id);
+        else commandMove(sim, rest, tx, ty);
+      }
     }
     return null;
   }
@@ -137,7 +190,9 @@ export function canPlace(sim: Sim, kind: BuildingKind, tx: number, ty: number): 
       if (!sim.nav.inBounds(x, y)) return 'Fora do mapa.';
       if (!TILE_INFO[getTile(sim.state.world, x, y)].buildable) return 'Terreno impróprio para construir.';
       if (sim.nodeAt(x, y)) return 'Há recursos no caminho.';
-      if (sim.buildingAt(x, y)) return 'Já existe uma construção aqui.';
+      const existing = sim.buildingAt(x, y);
+      // Portões podem substituir um segmento de paliçada.
+      if (existing && !(BUILDING_DEFS[kind].gate && existing.kind === 'palisade')) return 'Já existe uma construção aqui.';
     }
   }
   return null;
@@ -155,11 +210,76 @@ export function placeBuilding(
   const err = canPlace(sim, kind, tx, ty);
   if (err) return { error: err };
   pay(sim, def.cost);
+  if (def.gate) {
+    const old = sim.buildingAt(tx, ty);
+    if (old) removeBuilding(sim, old);
+  }
   const b = newBuilding(sim.nextId(), kind, tx, ty, false);
   sim.state.buildings.push(b);
   sim.occupyBuilding(b);
   commandBuild(sim, builderIds, b.id);
   return { building: b };
+}
+
+// Tiles de uma linha reta (8 direções) entre dois pontos — usada para muralhas.
+export function lineTiles(x0: number, y0: number, x1: number, y1: number): { tx: number; ty: number }[] {
+  const out: { tx: number; ty: number }[] = [];
+  const dx = Math.abs(x1 - x0);
+  const dy = Math.abs(y1 - y0);
+  const sx = x0 < x1 ? 1 : -1;
+  const sy = y0 < y1 ? 1 : -1;
+  let err = dx - dy;
+  let x = x0;
+  let y = y0;
+  for (;;) {
+    out.push({ tx: x, ty: y });
+    if (x === x1 && y === y1) break;
+    const e2 = 2 * err;
+    if (e2 > -dy) {
+      err -= dy;
+      x += sx;
+    }
+    if (e2 < dx) {
+      err += dx;
+      y += sy;
+    }
+  }
+  return out;
+}
+
+// Constrói uma linha de muralha. Pula tiles ocupados (inclusive muralha já existente)
+// e para quando os recursos acabam. Retorna quantos segmentos foram colocados.
+export function placeWallLine(
+  sim: Sim,
+  kind: BuildingKind,
+  x0: number,
+  y0: number,
+  x1: number,
+  y1: number,
+  builderIds: readonly number[],
+): number {
+  const def = BUILDING_DEFS[kind];
+  let placed = 0;
+  const tiles = lineTiles(x0, y0, x1, y1);
+  // Os construtores começam pela ponta mais próxima deles.
+  const list = units(sim, builderIds);
+  if (list.length) {
+    const ts = sim.tileSize;
+    const ux = list[0].x / ts;
+    const uy = list[0].y / ts;
+    if (Math.hypot(x1 - ux, y1 - uy) < Math.hypot(x0 - ux, y0 - uy)) tiles.reverse();
+  }
+  for (const { tx, ty } of tiles) {
+    if (!canAfford(sim, def.cost)) break;
+    if (canPlace(sim, kind, tx, ty)) continue;
+    pay(sim, def.cost);
+    const b = newBuilding(sim.nextId(), kind, tx, ty, false);
+    sim.state.buildings.push(b);
+    sim.occupyBuilding(b);
+    if (placed === 0) commandBuild(sim, builderIds, b.id);
+    placed++;
+  }
+  return placed;
 }
 
 export function trainUnit(sim: Sim, buildingId: number, kind: UnitKind): string | null {
@@ -202,11 +322,6 @@ export function deleteEntity(sim: Sim, id: number): void {
   const def = BUILDING_DEFS[b.kind];
   if (!b.built) refund(sim, def.cost, 1 - b.progress / def.buildTime);
   for (const item of b.queue) refund(sim, UNIT_DEFS[item.kind].cost);
-  sim.releaseBuilding(b);
-  sim.state.buildings.splice(sim.state.buildings.indexOf(b), 1);
-  for (const u of sim.state.units) {
-    const o = u.order;
-    if ((o.type === 'build' || o.type === 'deliver') && o.buildingId === id) setIdle(u);
-  }
-  addLog(sim.state, buildingMessage(def, 'demolido', 'demolida'));
+  removeBuilding(sim, b);
+  if (!def.wall) addLog(sim.state, buildingMessage(def, 'demolido', 'demolida'));
 }

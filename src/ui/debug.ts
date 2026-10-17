@@ -5,6 +5,7 @@ import type { GameState } from '../state';
 export interface DebugActions {
   setSpeed(speed: number): void;
   skipTicks(ticks: number): void;
+  spawnTitan(): void;
 }
 
 // Painel de desenvolvimento (F3). Serve para testar o balanceamento das eras longas.
@@ -30,6 +31,7 @@ export class DebugPanel {
     for (const s of BALANCE.debugSpeeds) add(`${s}x`, () => actions.setSpeed(s));
     add('+1 hora', () => actions.skipTicks(Math.floor(ticksPerDay() / 24)));
     add('+1 dia', () => actions.skipTicks(ticksPerDay()));
+    add('Titã perto', () => actions.spawnTitan());
     add('+1000 recursos', () => {
       for (const k of Object.keys(state.resources) as (keyof typeof state.resources)[]) state.resources[k] += 1000;
     });
@@ -52,7 +54,7 @@ export class DebugPanel {
         this.infoEl.innerHTML =
           `FPS: ${this.fps}<br>Seed: ${this.state.seed}<br>Tick: ${this.state.tick}<br>` +
           `Dia ${c.day}, ${c.season} (ano ${c.year})<br>Velocidade: ${this.state.speed}x<br>` +
-          `Recursos no mapa: ${this.state.world.resourceNodes.length}`;
+          `Recursos no mapa: ${this.state.world.resourceNodes.length}<br>Titãs vivos: ${this.state.titans.length}`;
       }
     }
   }

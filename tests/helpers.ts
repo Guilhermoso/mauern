@@ -33,3 +33,27 @@ export function runSeconds(sim: Sim, seconds: number): void {
 }
 
 export const CENTER = BALANCE.world.width / 2;
+
+import { titanStats } from '../src/systems/titans';
+import type { Titan } from '../src/entities/types';
+
+export function addTitan(s: GameState, tx: number, ty: number, height = 4): Titan {
+  const ts = BALANCE.world.tileSize;
+  const st = titanStats(height);
+  const t: Titan = {
+    id: s.nextId++, kind: 'common', height, x: (tx + 0.5) * ts, y: (ty + 0.5) * ts, hp: st.maxHp, maxHp: st.maxHp,
+    facing: 0, targetKind: 'none', targetId: 0, path: [], pathKey: '', repathTick: 0, retargetTick: 0,
+    attackCooldown: 0, lastHitTick: -1000, sighted: true, skin: 0.5,
+  };
+  s.titans.push(t);
+  return t;
+}
+
+// Coloca o relógio ao meio-dia de um dia (para os testes não dependerem da noite).
+export function setNoon(s: GameState, day = 1): void {
+  const perDay = BALANCE.time.ticksPerSecond * BALANCE.time.secondsPerDay;
+  s.tick = Math.round((day - 1) * perDay + ((12 - BALANCE.time.startHour) / 24) * perDay);
+  // Sem titãs avulsos durante os testes, a menos que o teste peça.
+  s.threat.nextSpawnTick = Number.MAX_SAFE_INTEGER;
+  s.threat.nextGreatAttackDay = 9999;
+}

@@ -5,6 +5,8 @@ export interface MenuActions {
   newCity(): void;
   setEdgePan(on: boolean): void;
   getEdgePan(): boolean;
+  setSound(on: boolean): void;
+  getSound(): boolean;
   getInfo(): string;
   onClose(): void;
 }
@@ -62,6 +64,15 @@ export class Menu {
     cb.onchange = () => a.setEdgePan(cb.checked);
     row.append(cb, document.createTextNode('Mover a câmera com o mouse na borda da tela'));
     modal.appendChild(row);
+
+    const soundRow = document.createElement('label');
+    soundRow.className = 'row';
+    const sb = document.createElement('input');
+    sb.type = 'checkbox';
+    sb.checked = a.getSound();
+    sb.onchange = () => a.setSound(sb.checked);
+    soundRow.append(sb, document.createTextNode('Sons (sino de alarme, corneta)'));
+    modal.appendChild(soundRow);
 
     const labels = ['Nova Cidade', 'Tem certeza? A cidade atual será perdida.', 'Clique de novo para APAGAR tudo'];
     const nc = button(labels[this.confirmStep], () => {

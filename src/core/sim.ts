@@ -4,23 +4,40 @@ import { NavGrid } from '../world/nav';
 import { Tile } from '../world/terrain';
 import { setTile } from '../world/world';
 import { Rng } from './rng';
-import type { Building, ResourceNode, Unit } from '../entities/types';
+import type { Building, ResourceNode, Titan, Unit } from '../entities/types';
 import type { GameState } from '../state';
+
+// Efeitos visuais disparados pela simulação (não são salvos; a renderização os consome).
+export type Fx =
+  | { type: 'steam'; x: number; y: number; size: number }
+  | { type: 'arrow'; x: number; y: number; x2: number; y2: number }
+  | { type: 'dust'; x: number; y: number; size: number }
+  | { type: 'hit'; x: number; y: number };
+
+// Avisos ao jogador (notificação + som). A interface os consome.
+export interface Alert {
+  kind: 'sighted' | 'underAttack' | 'greatAttack' | 'death' | 'destroyed';
+  text: string;
+  x: number;
+  y: number;
+}
 
 // Contexto da simulação: o estado salvo + estruturas derivadas (navegação, índices)
 // que são reconstruídas ao carregar. Nada aqui depende de renderização.
-
 export class Sim {
   readonly nav: NavGrid;
   readonly rng: Rng;
   private nodesById = new Map<number, ResourceNode>();
   private nodesByTile = new Map<number, ResourceNode>();
-  // Tiles cujo visual mudou (recurso esgotado etc.). A renderização consome esta lista.
+  private buildingGrid: Int32Array; // id do edifício em cada tile (0 = nenhum)
   terrainChanges: { tx: number; ty: number }[] = [];
+  fx: Fx[] = [];
+  alerts: Alert[] = [];
 
   constructor(readonly state: GameState) {
     this.nav = new NavGrid(state.world);
     this.rng = new Rng(state.rngState);
+    this.buildingGrid = new Int32Array(state.world.width * state.world.height);
     for (const n of state.world.resourceNodes) this.indexNode(n);
     for (const b of state.buildings) this.occupyBuilding(b);
   }
@@ -58,7 +75,7 @@ export class Sim {
     this.terrainChanges.push({ tx: n.tx, ty: n.ty });
   }
 
-  // --- Edifícios e unidades ---
+  // --- Edifícios, unidades e titãs ---
 
   building(id: number): Building | undefined {
     return this.state.buildings.find((b) => b.id === id);
@@ -68,21 +85,41 @@ export class Sim {
     return this.state.units.find((u) => u.id === id);
   }
 
+  titan(id: number): Titan | undefined {
+    return this.state.titans.find((t) => t.id === id);
+  }
+
   occupyBuilding(b: Building): void {
     const def = BUILDING_DEFS[b.kind];
-    if (!def.walkable) this.nav.occupy(b.tx, b.ty, def.size, def.size);
+    // Portões e fazendas não bloqueiam os humanos.
+    if (!def.walkable && !def.gate) this.nav.occupy(b.tx, b.ty, def.size, def.size);
+    this.fillGrid(b, b.id);
   }
 
   releaseBuilding(b: Building): void {
     const def = BUILDING_DEFS[b.kind];
-    if (!def.walkable) this.nav.release(b.tx, b.ty, def.size, def.size);
+    if (!def.walkable && !def.gate) this.nav.release(b.tx, b.ty, def.size, def.size);
+    this.fillGrid(b, 0);
+  }
+
+  private fillGrid(b: Building, value: number): void {
+    const s = BUILDING_DEFS[b.kind].size;
+    const w = this.state.world.width;
+    for (let y = b.ty; y < b.ty + s; y++) {
+      for (let x = b.tx; x < b.tx + s; x++) {
+        if (this.nav.inBounds(x, y)) this.buildingGrid[y * w + x] = value;
+      }
+    }
+  }
+
+  buildingIdAt(tx: number, ty: number): number {
+    if (!this.nav.inBounds(tx, ty)) return 0;
+    return this.buildingGrid[ty * this.state.world.width + tx];
   }
 
   buildingAt(tx: number, ty: number): Building | undefined {
-    return this.state.buildings.find((b) => {
-      const s = BUILDING_DEFS[b.kind].size;
-      return tx >= b.tx && ty >= b.ty && tx < b.tx + s && ty < b.ty + s;
-    });
+    const id = this.buildingIdAt(tx, ty);
+    return id ? this.building(id) : undefined;
   }
 
   nextId(): number {

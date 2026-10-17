@@ -13,6 +13,10 @@ import { TerrainLayer } from './render/terrainLayer';
 import { EntityLayer } from './render/entityLayer';
 import { Lighting } from './render/lighting';
 import { OverlayLayer } from './render/overlayLayer';
+import { FxLayer } from './render/fxLayer';
+import { bell, horn, setSoundEnabled, soundEnabled, thud, unlockAudioOnGesture } from './audio/sfx';
+import type { Alert } from './core/sim';
+import { spawnTitanNear } from './systems/titans';
 import { CameraInput, isTyping } from './input/cameraInput';
 import { Hud } from './ui/hud';
 import { Minimap } from './ui/minimap';
@@ -22,6 +26,23 @@ import { BottomPanel } from './ui/bottomPanel';
 import { SelectionController } from './input/selection';
 
 const EDGE_PAN_KEY = 'mauern.edgePan';
+const SOUND_KEY = 'mauern.sound';
+
+function readPref(key: string): string | null {
+  try {
+    return localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
+function writePref(key: string, value: string): void {
+  try {
+    localStorage.setItem(key, value);
+  } catch {
+    /* armazenamento indisponível */
+  }
+}
 
 async function boot(): Promise<void> {
   let state: GameState;
@@ -48,16 +69,15 @@ async function boot(): Promise<void> {
   const terrain = new TerrainLayer(state.world, hashString(state.seed), app.renderer);
   const entities = new EntityLayer();
   const overlay = new OverlayLayer();
-  world.addChild(terrain.container, overlay.under, entities.container, overlay.over);
+  const fx = new FxLayer();
+  world.addChild(terrain.container, overlay.under, entities.container, fx.g, overlay.over);
   const lighting = new Lighting();
   app.stage.addChild(world, lighting.overlay, overlay.screen);
 
   const input = new CameraInput(camera, app.canvas);
-  try {
-    input.edgePan = localStorage.getItem(EDGE_PAN_KEY) !== 'off';
-  } catch {
-    /* armazenamento indisponível: mantém o padrão */
-  }
+  input.edgePan = readPref(EDGE_PAN_KEY) !== 'off';
+  setSoundEnabled(readPref(SOUND_KEY) !== 'off');
+  unlockAudioOnGesture();
 
   // --- Salvamento ---
   let saving = false;
@@ -115,13 +135,14 @@ async function boot(): Promise<void> {
     newCity: () => void replaceGame(createNewGame(randomSeed())),
     setEdgePan: (on) => {
       input.edgePan = on;
-      try {
-        localStorage.setItem(EDGE_PAN_KEY, on ? 'on' : 'off');
-      } catch {
-        /* ignora */
-      }
+      writePref(EDGE_PAN_KEY, on ? 'on' : 'off');
     },
     getEdgePan: () => input.edgePan,
+    setSound: (on) => {
+      setSoundEnabled(on);
+      writePref(SOUND_KEY, on ? 'on' : 'off');
+    },
+    getSound: () => soundEnabled(),
     getInfo: () => {
       const c = getClock(state.tick);
       return `Dia ${c.day} desde a fundação · ${c.season}, ano ${c.year} · seed ${state.seed}`;
@@ -139,9 +160,63 @@ async function boot(): Promise<void> {
     skipTicks: (n) => {
       for (let i = 0; i < n; i++) step(sim);
     },
+    spawnTitan: () => {
+      const day = getClock(state.tick).day;
+      spawnTitanNear(sim, Math.min(7, 3 + day * 0.3 + Math.random() * 2), 24);
+    },
   });
-  ui.append(hud.topbar, minimap.el, bottom.el, hud.log, hud.toasts, debug.el, menu.el);
+  // Tela de derrota: o Centro da Vila caiu.
+  const gameOver = document.createElement('div');
+  gameOver.className = 'modal-backdrop hidden';
+  let isGameOver = false;
+  const showGameOver = () => {
+    isGameOver = true;
+    setSpeed(0);
+    const c = getClock(state.tick);
+    gameOver.innerHTML = '';
+    const modal = document.createElement('div');
+    modal.className = 'modal panel gameover';
+    const h = document.createElement('h2');
+    h.textContent = 'A CIDADE CAIU';
+    const p = document.createElement('div');
+    p.className = 'row';
+    p.textContent = `O Centro da Vila foi destruído no dia ${c.day}. Os sobreviventes se dispersam...`;
+    const btn = document.createElement('button');
+    btn.textContent = 'Fundar uma nova cidade';
+    btn.onclick = () => void replaceGame(createNewGame(randomSeed()));
+    modal.append(h, p, btn);
+    gameOver.appendChild(modal);
+    gameOver.classList.remove('hidden');
+  };
+
+  ui.append(hud.topbar, hud.paused, minimap.el, bottom.el, hud.log, hud.toasts, debug.el, menu.el, gameOver);
   if (loadWarning) hud.toast(loadWarning);
+
+  // Avisos da simulação: notificação clicável (leva a câmera ao local) e som, sem repetir demais.
+  const lastAlert: Partial<Record<Alert['kind'], number>> = {};
+  const throttle: Record<Alert['kind'], number> = { sighted: 6000, underAttack: 15000, greatAttack: 0, death: 2500, destroyed: 4000 };
+  const handleAlert = (a: Alert) => {
+    const now = performance.now();
+    if (now - (lastAlert[a.kind] ?? -Infinity) < throttle[a.kind]) return;
+    lastAlert[a.kind] = now;
+    const goTo = () => camera.centerOn(a.x, a.y);
+    switch (a.kind) {
+      case 'sighted':
+      case 'underAttack':
+        hud.toast(a.text, goTo, true);
+        bell(a.kind === 'underAttack' ? 3 : 2);
+        break;
+      case 'greatAttack':
+        hud.toast(a.text, goTo, true);
+        horn();
+        break;
+      case 'death':
+      case 'destroyed':
+        hud.toast(a.text, goTo, true);
+        thud();
+        break;
+    }
+  };
 
   window.addEventListener('keydown', (e) => {
     if (isTyping(e)) return;
@@ -151,7 +226,7 @@ async function boot(): Promise<void> {
       else if (!selection.handleKey(e)) openMenu();
       return;
     }
-    if (menu.isOpen) return;
+    if (menu.isOpen || isGameOver) return;
     if (selection.handleKey(e)) return;
     switch (e.code) {
       case 'Space':
@@ -199,7 +274,16 @@ async function boot(): Promise<void> {
       sim.terrainChanges = [];
     }
     terrain.update(camera.viewRect());
-    entities.sync(state, performance.now() / 1000);
+    entities.sync(sim, performance.now() / 1000);
+    if (sim.fx.length) {
+      fx.add(sim.fx);
+      sim.fx = [];
+    }
+    fx.update(dtMs / 1000);
+    if (sim.alerts.length) {
+      for (const a of sim.alerts) handleAlert(a);
+      sim.alerts = [];
+    }
     overlay.update(sim, selection, camera.zoom);
     lighting.update(getClock(state.tick).dayFraction, camera.screenW, camera.screenH);
 
@@ -208,8 +292,10 @@ async function boot(): Promise<void> {
     if (hudTimer > 200) {
       hudTimer = 0;
       hud.update(state);
+      hud.setPaused(state.speed === 0 && !menu.isOpen && !isGameOver);
       selection.prune();
       bottom.update();
+      if (!isGameOver && !state.buildings.some((b) => b.kind === 'townCenter')) showGameOver();
     }
     minimap.draw();
     debug.update();

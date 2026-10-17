@@ -10,13 +10,23 @@ O documento de design completo está em [docs/DESIGN.md](docs/DESIGN.md).
 Você começa com o Centro da Vila, 4 aldeões e 1 batedor. Coloque os aldeões para coletar comida e madeira,
 treine mais aldeões no Centro da Vila e construa casas para aumentar o limite de população.
 
+Os primeiros dias são calmos. Depois, titãs começam a vir das bordas do mapa — de dia são rápidos, à noite
+ficam lentos. A cada 7 dias há um **Grande Ataque**, anunciado na véspera. Cerque a vila com paliçada,
+construa torres de vigia, treine milicianos e, no aperto, toque o sino para os aldeões se abrigarem.
+Titãs não abatidos continuam no mundo. Se o Centro da Vila cair, a cidade está perdida.
+
 | Ação | Controle |
 | --- | --- |
 | Selecionar | Clique esquerdo; arraste para selecionar várias unidades; Shift+clique adiciona |
 | Selecionar todas do mesmo tipo na tela | Duplo clique numa unidade |
 | Dar ordem (andar, coletar, construir, entregar) | Clique direito no destino |
-| Construir (com aldeão selecionado) | Botões do painel ou Q casa · E depósito de madeira · R depósito de mineração · F moinho · G fazenda. Shift+clique constrói várias |
-| Treinar aldeão (Centro da Vila selecionado) | Q (Shift+Q treina 5) |
+| Construir (com aldeão selecionado) | Botões do painel ou Q casa · E depósito de madeira · R depósito de mineração · F moinho · G fazenda · T torre de vigia. Shift+clique constrói várias |
+| Paliçada (com aldeão selecionado) | Z e arraste para traçar a linha · X portão (pode ser posto sobre a paliçada) |
+| Treinar (Centro da Vila selecionado) | Q aldeão · E miliciano (Shift treina 5) |
+| Atacar um titã | Selecione unidades e clique direito no titã |
+| Abrigar unidades | Clique direito no Centro da Vila ou numa torre · U libera os abrigados |
+| Sino de alarme (Centro da Vila selecionado) | B toca / desliga: aldeões se abrigam e depois voltam ao trabalho |
+| Reparar | Clique direito com aldeões num edifício danificado |
 | Ponto de reunião (Centro da Vila selecionado) | Clique direito no mapa ou num recurso |
 | Grupos de controle | Ctrl+1–9 cria · 1–9 seleciona · duas vezes centraliza |
 | Próximo aldeão ocioso | . (ponto) ou botão "Ociosos" |
@@ -25,7 +35,8 @@ treine mais aldeões no Centro da Vila e construa casas para aumentar o limite d
 | Mover a câmera | WASD / setas, mouse na borda da tela, arrastar com o botão do meio |
 | Zoom | Roda do mouse |
 | Pausar / velocidade | Espaço · + / − ou botões na barra superior |
-| Menu (salvar, exportar, importar, nova cidade) | Esc |
+| Notificações (titã avistado, ataque) | Clique nelas para ir ao local |
+| Menu (salvar, exportar, importar, nova cidade, sons) | Esc |
 | Painel de debug | F3 |
 
 O jogo salva sozinho a cada 30 segundos e ao fechar a aba (no próprio navegador).

@@ -1,13 +1,14 @@
 import { Container, Graphics } from 'pixi.js';
 import { BALANCE } from '../data/balance';
 import { BUILDING_DEFS } from '../data/defs';
-import type { GameState } from '../state';
+import type { Sim } from '../core/sim';
 import type { Building, ResourceKind, Unit } from '../entities/types';
 import { PLAYER_COLOR } from './colors';
-import { drawBuildingArt, type BuildingArt } from './buildingArt';
+import { drawBuildingArt, NEIGHBOR_DIRS, type BuildingArt } from './buildingArt';
+import { createTitanView, updateTitanView, type TitanView } from './titanArt';
 
-// Desenha edifícios e unidades. Cada entidade tem uma view criada uma vez e atualizada a cada quadro;
-// edifícios são redesenhados quando o estado visual muda (ex.: progresso da construção).
+// Desenha edifícios, unidades e titãs. Cada entidade tem uma view criada uma vez e atualizada a cada quadro;
+// edifícios são redesenhados quando o estado visual muda (progresso da construção, vizinhos da muralha).
 
 const CARRY_COLORS: Record<ResourceKind, number> = {
   food: 0xd2553f,
@@ -34,23 +35,26 @@ export class EntityLayer {
   readonly container = new Container();
   private buildings = new Map<number, BuildingView>();
   private units = new Map<number, UnitView>();
+  private titans = new Map<number, TitanView>();
 
   constructor() {
     this.container.sortableChildren = true;
   }
 
-  sync(state: GameState, timeSec: number): void {
+  sync(sim: Sim, timeSec: number): void {
+    const state = sim.state;
     const ts = BALANCE.world.tileSize;
     const aliveB = new Set<number>();
     for (const b of state.buildings) {
       aliveB.add(b.id);
       const def = BUILDING_DEFS[b.kind];
       const p = b.built ? 1 : b.progress / def.buildTime;
-      const key = `${b.built}|${Math.floor(p * 10)}`;
+      const mask = def.wall || def.gate ? wallMask(sim, b) : 0;
+      const key = `${b.built}|${Math.floor(p * 10)}|${mask}`;
       let v = this.buildings.get(b.id);
       if (!v || v.key !== key) {
         if (v) v.art.root.destroy({ children: true });
-        v = { art: drawBuildingArt(b.kind, b.built, p), key };
+        v = { art: drawBuildingArt(b.kind, b.built, p, mask), key };
         v.art.root.position.set(b.tx * ts, b.ty * ts);
         this.buildings.set(b.id, v);
         this.container.addChild(v.art.root);
@@ -83,7 +87,34 @@ export class EntityLayer {
         this.units.delete(id);
       }
     }
+
+    const aliveT = new Set<number>();
+    for (const t of state.titans) {
+      aliveT.add(t.id);
+      let v = this.titans.get(t.id);
+      if (!v) {
+        v = createTitanView(t);
+        this.titans.set(t.id, v);
+        this.container.addChild(v.root);
+      }
+      updateTitanView(v, t, state.tick, BALANCE.titans.attackCooldown);
+    }
+    for (const [id, v] of this.titans) {
+      if (!aliveT.has(id)) {
+        v.root.destroy({ children: true });
+        this.titans.delete(id);
+      }
+    }
   }
+}
+
+function wallMask(sim: Sim, b: Building): number {
+  let mask = 0;
+  NEIGHBOR_DIRS.forEach(([dx, dy], i) => {
+    const n = sim.buildingAt(b.tx + dx, b.ty + dy);
+    if (n && (BUILDING_DEFS[n.kind].wall || BUILDING_DEFS[n.kind].gate)) mask |= 1 << i;
+  });
+  return mask;
 }
 
 function createUnitView(u: Unit): UnitView {
@@ -100,6 +131,15 @@ function createUnitView(u: Unit): UnitView {
     tool.rect(0, -1, 9, 2).fill(0x6b4a2a);
     tool.rect(7, -3, 3, 6).fill(0x9aa0a6);
     tool.visible = false;
+  } else if (u.kind === 'militia') {
+    body.ellipse(2, 5, 7, 4).fill({ color: 0x000000, alpha: 0.3 });
+    body.circle(0, 0, 7).fill(PLAYER_COLOR);
+    body.circle(0, 0, 7).stroke({ width: 1.2, color: 0x1d3a78 });
+    body.circle(0, -1, 3.8).fill(0x9aa0a6); // elmo
+    body.circle(-0.8, -1.8, 1.4).fill(0xc9ced3);
+    // Lança
+    tool.rect(-4, -1, 18, 1.6).fill(0x6b4a2a);
+    tool.poly([14, -3, 19, 0, 14, 3]).fill(0xc9ced3);
   } else {
     body.ellipse(3, 6, 13, 6).fill({ color: 0x000000, alpha: 0.3 });
     body.ellipse(0, 0, 12, 5.5).fill(0x6b4426);
@@ -112,13 +152,22 @@ function createUnitView(u: Unit): UnitView {
 }
 
 function updateUnitView(v: UnitView, u: Unit, timeSec: number): void {
-  const working = !u.moving && (u.order.type === 'gather' || u.order.type === 'build' || u.order.type === 'farm');
+  v.root.visible = !u.garrison;
+  if (u.garrison) return;
+  const working = !u.moving && (u.order.type === 'gather' || u.order.type === 'build' || u.order.type === 'farm' || u.order.type === 'attack');
   // Andando: balança mais; parado: respiração leve.
   const bob = u.moving ? Math.abs(Math.sin(timeSec * 12 + u.id)) * -1.5 : Math.sin(timeSec * 2 + u.id) * 0.6;
   v.root.position.set(u.x, u.y + bob);
   v.root.zIndex = u.y;
   if (u.kind === 'scout') {
     v.body.rotation = u.facing;
+    return;
+  }
+  if (u.kind === 'militia') {
+    // A lança aponta para a frente e estoca durante o combate.
+    const thrust = working ? Math.max(0, Math.sin(timeSec * 8 + u.id)) * 5 : 0;
+    v.tool.rotation = u.facing;
+    v.tool.position.set(Math.cos(u.facing) * thrust, Math.sin(u.facing) * thrust);
     return;
   }
   v.tool.visible = working;
@@ -134,10 +183,4 @@ function updateUnitView(v: UnitView, u: Unit, timeSec: number): void {
       for (let i = 0; i < n; i++) v.carry.rect(3, 1 - i * 3, 6, 3).fill(CARRY_COLORS[u.carry.kind]).stroke({ width: 0.5, color: 0x000000, alpha: 0.4 });
     }
   }
-}
-
-export function buildingCenterPx(b: Building): { x: number; y: number } {
-  const ts = BALANCE.world.tileSize;
-  const s = BUILDING_DEFS[b.kind].size * ts;
-  return { x: b.tx * ts + s / 2, y: b.ty * ts + s / 2 };
 }
