@@ -5,6 +5,8 @@ import type { Sim } from '../core/sim';
 import { foodPerDay, moraleTarget, taxesPerDay, winterWoodPerDay } from '../systems/city';
 import { ERA_NAMES } from '../systems/era';
 import type { ResourceKind } from '../entities/types';
+import { NODE_DEFS } from '../data/defs';
+import { cmdIconImg } from './cmdIcons';
 
 export interface HudActions {
   setSpeed(speed: number): void;
@@ -25,6 +27,8 @@ const RESOURCES: { key: ResourceKind; label: string; color: string }[] = [
 // Barra superior, diário de eventos e notificações. O texto é atualizado algumas vezes por segundo.
 export class Hud {
   readonly topbar = document.createElement('div');
+  readonly resPanel = document.createElement('div'); // recursos ao lado do minimapa (estilo AoE3)
+  private gathererEls = new Map<ResourceKind, HTMLElement>();
   readonly log = document.createElement('div');
   readonly toasts = document.createElement('div');
   private resEls = new Map<ResourceKind, HTMLElement>();
@@ -44,21 +48,31 @@ export class Hud {
 
   constructor(private actions: HudActions) {
     this.topbar.className = 'topbar panel';
-    for (const r of RESOURCES) {
-      const el = document.createElement('div');
-      el.className = 'res';
-      el.title = r.label;
-      el.innerHTML = `<span class="chip" style="background:${r.color}"></span><span class="label">${r.label}</span><b>0</b>`;
-      this.topbar.appendChild(el);
-      this.resEls.set(r.key, el.querySelector('b')!);
-      this.resWrap.set(r.key, el);
-    }
+    // Painel de recursos: [aldeões coletando] [ícone] [quantidade]
+    this.resPanel.className = 'respanel panel';
     const pop = document.createElement('div');
-    pop.className = 'res';
-    pop.title = 'População / limite';
-    pop.innerHTML = `<span class="chip" style="background:#3a6fd8"></span><span class="label">População</span><b>0</b>`;
-    this.popEl = pop.querySelector('b')!;
-    this.topbar.appendChild(pop);
+    pop.className = 'res-row pop';
+    pop.title = 'População / limite (construa casas para aumentar)';
+    pop.append(cmdIconImg('res-pop', 'res-icon'));
+    this.popEl = document.createElement('b');
+    this.popEl.className = 'res-amount';
+    pop.append(this.popEl);
+    this.resPanel.appendChild(pop);
+    for (const r of RESOURCES) {
+      const row = document.createElement('div');
+      row.className = 'res-row';
+      row.title = r.label;
+      const count = document.createElement('span');
+      count.className = 'res-gatherers';
+      count.textContent = '0';
+      const amount = document.createElement('b');
+      amount.className = 'res-amount';
+      row.append(count, cmdIconImg(`res-${r.key}`, 'res-icon'), amount);
+      this.resPanel.appendChild(row);
+      this.resEls.set(r.key, amount);
+      this.resWrap.set(r.key, row);
+      this.gathererEls.set(r.key, count);
+    }
 
     this.moraleEl.className = 'morale';
     this.topbar.appendChild(this.moraleEl);
@@ -116,6 +130,13 @@ export class Hud {
   update(sim: Sim): void {
     const state = sim.state;
     for (const r of RESOURCES) this.resEls.get(r.key)!.textContent = String(Math.floor(state.resources[r.key]));
+    // Aldeões trabalhando em cada recurso (fazendeiros contam como comida).
+    const working: Record<ResourceKind, number> = { food: 0, wood: 0, stone: 0, iron: 0, gold: 0 };
+    for (const u of state.units) {
+      if (u.order.type === 'farm') working.food++;
+      else if (u.order.type === 'gather') working[NODE_DEFS[u.order.nodeKind].resource]++;
+    }
+    for (const r of RESOURCES) this.gathererEls.get(r.key)!.textContent = String(working[r.key]);
     this.eraBtn.textContent = ERA_NAMES[state.era];
     // Dicas com consumo e produção.
     const fpd = foodPerDay(sim);

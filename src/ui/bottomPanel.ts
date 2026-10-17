@@ -1,6 +1,7 @@
 import { BUILDING_DEFS, NODE_DEFS, RESOURCE_NAMES, UNIT_DEFS, VILLAGER_BUILDS, formatCost, unitNoun } from '../data/defs';
 import { isFemaleName } from '../entities/names';
 import { iconImg } from './icons';
+import { cmdIconImg } from './cmdIcons';
 import { batchTime } from '../systems/production';
 import type { Sim } from '../core/sim';
 import type { SelectionController } from '../input/selection';
@@ -92,11 +93,22 @@ export class BottomPanel {
     else if (s.titan !== null) this.buildTitan(s.titan);
   }
 
+  // Cabeçalho: retrato com moldura, nome e subtítulo.
+  private header(portrait: HTMLElement, title: string, sub: string): void {
+    const head = el('div', 'bp-head');
+    const frame = el('div', 'portrait-frame');
+    frame.appendChild(portrait);
+    const text = el('div', 'bp-head-text');
+    text.append(el('div', 'bp-title', title));
+    if (sub) text.append(el('div', 'bp-sub', sub));
+    head.append(frame, text);
+    this.info.appendChild(head);
+  }
+
   private buildTitan(id: number): void {
     const t = this.sim.titan(id);
     if (!t) return;
-    this.info.append(el('div', 'bp-title', 'Titã'));
-    this.info.append(el('div', 'bp-sub', `${t.height.toFixed(1).replace('.', ',')} metros de altura`));
+    this.header(cmdIconImg('titan', 'portrait-img'), 'Titã', `${t.height.toFixed(1).replace('.', ',')} metros de altura`);
     const hp = el('div', 'bp-line');
     const status = el('div', 'bp-line');
     this.info.append(hp, status);
@@ -113,22 +125,19 @@ export class BottomPanel {
     const units = ids.map((id) => this.sim.unit(id)).filter((u): u is Unit => !!u);
     if (units.length === 1) {
       const u = units[0];
-      const title = el('div', 'bp-title with-portrait', u.name);
-      title.prepend(iconImg(u.kind, 'portrait'));
-      const sub = el('div', 'bp-sub', unitNoun(u.kind, isFemaleName(u.name)));
-      const hp = el('div', 'bp-line');
+      this.header(iconImg(u.kind, 'portrait-img'), u.name, unitNoun(u.kind, isFemaleName(u.name)));
+      const hp = el('div', 'bp-line bp-stat');
       const status = el('div', 'bp-line');
-      this.info.append(title, sub);
       if (isSoldier(u)) this.soldierLines(u);
       this.info.append(hp, status);
       this.updaters.push(() => {
-        hp.textContent = `Vida: ${Math.ceil(u.hp)}/${unitMaxHp(this.sim.state, u)}`;
+        hp.innerHTML = `<span class="st-heart">❤</span> ${Math.ceil(u.hp)}/${unitMaxHp(this.sim.state, u)}`;
         status.textContent = unitStatus(this.sim, u);
       });
     } else {
       const counts = new Map<UnitKind, number>();
       for (const u of units) counts.set(u.kind, (counts.get(u.kind) ?? 0) + 1);
-      this.info.append(el('div', 'bp-title', `${units.length} unidades`));
+      this.header(iconImg(units[0].kind, 'portrait-img'), `${units.length} unidades`, '');
       for (const [kind, n] of counts) {
         const row = el('div', 'bp-line with-icon-line', `${n}× ${UNIT_DEFS[kind].name}`);
         row.prepend(iconImg(kind, 'mini-icon'));
@@ -141,7 +150,7 @@ export class BottomPanel {
     if (units.some((u) => isSoldier(u))) {
       this.commands.appendChild(
         cmdButton('Formar batalhão', 'o de maior nível comanda', 'B', 'Junta os soldados selecionados num batalhão: andam e lutam juntos.', () =>
-          this.sel.formBattalionFromSelection(),
+          this.sel.formBattalionFromSelection(), 'battalion',
         ),
       );
     }
@@ -150,12 +159,12 @@ export class BottomPanel {
         const def = BUILDING_DEFS[kind];
         const letter = def.hotkey?.replace('Key', '') ?? '';
         const label = def.wall ? `${def.name} (por segmento)` : def.name;
-        const b = cmdButton(label, formatCost(def.cost), letter, `${def.name}: ${def.description}`, () => this.sel.startPlacing(kind));
+        const b = cmdButton(label, formatCost(def.cost), letter, `${def.name}: ${def.description}`, () => this.sel.startPlacing(kind), kind);
         this.commands.appendChild(b);
         this.updaters.push(() => b.classList.toggle('disabled', !canAfford(this.sim, def.cost)));
       }
     }
-    this.commands.appendChild(cmdButton('Parar', '', '', 'Interrompe a ordem atual', () => this.sel.stopSelected()));
+    this.commands.appendChild(cmdButton('Parar', '', '', 'Interrompe a ordem atual', () => this.sel.stopSelected(), 'stop'));
     this.commands.appendChild(dangerButton('Dispensar', 'Del', () => this.sel.deleteSelected()));
   }
 
@@ -164,10 +173,10 @@ export class BottomPanel {
     if (!b) return;
     const def = BUILDING_DEFS[b.kind];
     const title = b.kind === 'house' && b.built ? BALANCE.city.houseLevelNames[b.level - 1] : def.name;
-    this.info.append(el('div', 'bp-title', title));
-    const hp = el('div', 'bp-line');
+    this.header(cmdIconImg(b.kind, 'portrait-img'), title, b.built ? '' : 'Em construção');
+    const hp = el('div', 'bp-line bp-stat');
     this.info.append(hp);
-    this.updaters.push(() => (hp.textContent = `Vida: ${Math.ceil(b.hp)}/${buildingMaxHp(this.sim.state, b)}`));
+    this.updaters.push(() => (hp.innerHTML = `<span class="st-heart">❤</span> ${Math.ceil(b.hp)}/${buildingMaxHp(this.sim.state, b)}`));
 
     if (!b.built) {
       const p = el('div', 'bp-line');
@@ -203,6 +212,7 @@ export class BottomPanel {
         'B',
         alarm ? 'Fim do alarme: os aldeões saem e retomam o que faziam.' : 'Sino de alarme: os aldeões correm para o Centro da Vila e as torres.',
         () => (this.sim.state.alarm ? stopAlarm(this.sim) : ringAlarm(this.sim)),
+        'bell',
       );
       if (alarm) bellBtn.classList.add('active-alarm');
       this.commands.appendChild(bellBtn);
@@ -227,7 +237,7 @@ export class BottomPanel {
       const tip = udef.military
         ? `${udef.name} (${udef.trainTime}s). Treina em lotes de até ${batch}: cada clique soma 1 ao lote; Shift+clique (ou Shift+${key}) enfileira um lote cheio.`
         : `${udef.name} (${udef.trainTime}s). Shift+${key} enfileira 5.`;
-      const btn = cmdButton(`Treinar ${udef.name.toLowerCase()}`, formatCost(udef.cost), key, tip, () => {});
+      const btn = cmdButton(`Treinar ${udef.name.toLowerCase()}`, formatCost(udef.cost), key, tip, () => {}, `unit:${kind}`);
       btn.onclick = (ev) => {
         const shift = ev.shiftKey;
         const times = shift && !udef.military ? 5 : 1;
@@ -239,8 +249,6 @@ export class BottomPanel {
           }
         }
       };
-      btn.classList.add('with-icon');
-      btn.prepend(iconImg(kind, 'cmd-icon'));
       this.commands.appendChild(btn);
       this.updaters.push(() => btn.classList.toggle('disabled', !canAfford(this.sim, udef.cost)));
     }
@@ -285,7 +293,7 @@ export class BottomPanel {
   private soldierLines(u: Unit): void {
     const rank = el('div', 'bp-rank');
     const bar = progressBar();
-    const stats = el('div', 'bp-line');
+    const stats = el('div', 'bp-line bp-stat');
     const glory = el('div', 'bp-line bp-lead');
     const buffs = el('div', 'bp-buffs');
     this.info.append(rank, bar.el, stats, glory, buffs);
@@ -299,7 +307,7 @@ export class BottomPanel {
         buffs.innerHTML = '';
         for (const b of list) {
           const ic = el('span', `buff-icon ${b.kind}`, b.icon);
-          ic.onmouseenter = () => showTip(ic, b.name, b.effect, b.source);
+          ic.onmouseenter = () => showTip(ic, b.name, b.effect, `Fonte: ${b.source}`);
           ic.onmouseleave = hideTip;
           buffs.appendChild(ic);
         }
@@ -320,7 +328,7 @@ export class BottomPanel {
       const need = xpToNext(u.level);
       bar.set(u.level >= MAX_LEVEL ? 1 : u.xp / need);
       bar.el.title = u.level >= MAX_LEVEL ? 'Nível máximo' : `Experiência: ${Math.floor(u.xp)}/${need}`;
-      stats.textContent = `Ataque ${unitAttack(this.sim.state, u).toFixed(1).replace('.', ',')}`;
+      stats.innerHTML = `<span class="st-sword">⚔</span> ${unitAttack(this.sim.state, u).toFixed(1).replace('.', ',')}`;
     });
   }
 
@@ -339,6 +347,7 @@ export class BottomPanel {
         const err = ennoble(this.sim, u.id);
         if (err) this.toast(err);
       },
+      'crown',
     );
     const costEl = btn.querySelector('.cmd-cost')!;
     this.updaters.push(() => {
@@ -353,11 +362,8 @@ export class BottomPanel {
     const b = battalionOf(this.sim, id);
     if (!b) return;
     const c = this.sim.unit(b.commanderId);
-    this.info.append(el('div', 'bp-title', b.name));
-    if (c) {
-      this.info.append(el('div', 'bp-sub', `Comandante: ${c.name}`));
-      this.soldierLines(c);
-    }
+    this.header(c ? iconImg(c.kind, 'portrait-img') : cmdIconImg('battalion', 'portrait-img'), b.name, c ? `Comandante: ${c.name}` : '');
+    if (c) this.soldierLines(c);
     const lead = el('div', 'bp-line bp-lead');
     const size = el('div', 'bp-line');
     const status = el('div', 'bp-line');
@@ -388,7 +394,7 @@ export class BottomPanel {
       ['hunt', 'Caçar titãs', 'patrulha o mapa', 'Sai pelo mapa procurando titãs para abater.'],
     ];
     for (const [mode, label, cost, title] of modes) {
-      const btn = cmdButton(label, cost, '', title, () => setMode(this.sim, b.id, mode));
+      const btn = cmdButton(label, cost, '', title, () => setMode(this.sim, b.id, mode), mode === 'manual' ? 'manual' : mode === 'defend' ? 'defend' : 'hunt');
       if (b.mode === mode) btn.classList.add('active-mode');
       this.commands.appendChild(btn);
     }
@@ -401,6 +407,7 @@ export class BottomPanel {
       '',
       `Quando uma unidade marcada com ✚ ficar abaixo de ${Math.round(BALANCE.hospital.criticalHp * 100)}% de vida, o batalhão corre para um hospital com leitos para todos.`,
       () => setAutoHospital(this.sim, b.id, !b.autoHospital),
+      'autoHospital',
     );
     if (b.autoHospital) auto.classList.add('active-mode');
     this.commands.appendChild(auto);
@@ -419,7 +426,7 @@ export class BottomPanel {
       const btn = cmdButton(label, unlocked ? 'formação' : `comandante nível ${lvl}`, '', unlocked ? title : `${title} Libera com o comandante no nível ${lvl}.`, () => {
         const err = setFormation(this.sim, b.id, f);
         if (err) this.toast(err);
-      });
+      }, `f-${f}`);
       if (!unlocked) btn.classList.add('disabled');
       else if (b.formation === f) btn.classList.add('active-mode');
       this.commands.appendChild(btn);
@@ -484,11 +491,11 @@ export class BottomPanel {
       const up = cmdButton(`Ampliar (nível ${b.level + 1})`, formatCost(cost), '', `+${H.bedsPerLevel} leitos. Leva ${Math.round(upgradeTime(b))} s.`, () => {
         const err = startHospitalUpgrade(this.sim, b.id);
         if (err) this.toast(err);
-      });
+      }, 'upgrade');
       this.commands.appendChild(up);
       this.updaters.push(() => up.classList.toggle('disabled', !canAfford(this.sim, cost)));
     }
-    if (b.doctorIds.length) this.commands.appendChild(dangerButton('Dispensar médicos', '', () => dismissDoctors(this.sim, b.id)));
+    if (b.doctorIds.length) this.commands.appendChild(dangerButton('Dispensar médicos', '', () => dismissDoctors(this.sim, b.id), 'dismiss'));
     // Pacientes com a vida de cada um.
     const list = el('div', 'bp-members wide');
     const ps = patients(this.sim, b);
@@ -505,13 +512,13 @@ export class BottomPanel {
   }
 
   private buildMixed(battalions: number[], units: number[]): void {
-    this.info.append(el('div', 'bp-title', `${battalions.length} batalhão(ões)${units.length ? ` + ${units.length} unidade(s)` : ''}`));
+    this.header(cmdIconImg('battalion', 'portrait-img'), `${battalions.length} batalhão(ões)`, units.length ? `+ ${units.length} unidade(s)` : '');
     for (const id of battalions) {
       const b = battalionOf(this.sim, id);
       if (b) this.info.append(el('div', 'bp-line', `${b.name}: ${b.memberIds.length + 1} soldados`));
     }
     this.info.append(el('div', 'bp-hint', 'Clique direito: todos se movem ou atacam juntos.'));
-    this.commands.appendChild(cmdButton('Parar', '', '', 'Interrompe a ordem atual', () => this.sel.stopSelected()));
+    this.commands.appendChild(cmdButton('Parar', '', '', 'Interrompe a ordem atual', () => this.sel.stopSelected(), 'stop'));
   }
 
   // Abrigos (Centro da Vila, torres, Campo de Refúgio): quem está dentro, terror e como liberar.
@@ -537,18 +544,18 @@ export class BottomPanel {
           ? `Guarda no posto: ${g.name} — ${rankName(g.level)} (terror passa ${Math.round(g.level * BALANCE.refuge.guardBonusPerLevel * 100)}% mais rápido)`
           : 'Sem guarda: mande um soldado para cá (botão direito) para acalmar os aldeões.';
       });
-      if (guardOf(this.sim, b)) this.commands.appendChild(cmdButton('Dispensar guarda', '', '', 'O soldado deixa o posto', () => dismissGuard(this.sim, b.id)));
+      if (guardOf(this.sim, b)) this.commands.appendChild(cmdButton('Dispensar guarda', '', '', 'O soldado deixa o posto', () => dismissGuard(this.sim, b.id), 'dismiss'));
     }
     if (garrisonCount(this.sim, b) > 0) {
       this.commands.appendChild(
         cmdButton('Sair', 'ficam ociosos', 'U', 'Os abrigados que não estão aterrorizados saem do edifício.', () => {
           if (releaseShelter(this.sim, b.id, false) === 0) this.toast('Ninguém pode sair agora (aterrorizados ou ninguém dentro).');
-        }),
+        }, 'exit'),
       );
       this.commands.appendChild(
         cmdButton('Voltar ao trabalho', 'retomam o que faziam', '', 'Os abrigados que não estão aterrorizados saem e voltam ao que faziam antes de fugir.', () => {
           if (releaseShelter(this.sim, b.id, true) === 0) this.toast('Ninguém pode sair agora (aterrorizados ou ninguém dentro).');
-        }),
+        }, 'work'),
       );
     }
   }
@@ -582,7 +589,7 @@ export class BottomPanel {
       };
       list.appendChild(row);
     }
-    if (trainees(this.sim, b).length) this.commands.appendChild(dangerButton('Dispensar todos', '', () => dismissTraining(this.sim, b.id)));
+    if (trainees(this.sim, b).length) this.commands.appendChild(dangerButton('Dispensar todos', '', () => dismissTraining(this.sim, b.id), 'dismiss'));
     this.commands.append(list);
   }
 
@@ -629,7 +636,7 @@ export class BottomPanel {
       const btn = cmdButton(t.name, formatCost(t.cost), '', `${t.description} Duração: ${days.toFixed(1).replace('.', ',')} dia(s) de jogo.`, () => {
         const err = startResearch(this.sim, b.id, id);
         if (err) this.toast(err);
-      });
+      }, id);
       btn.classList.add('tech');
       this.commands.appendChild(btn);
       this.updaters.push(() => btn.classList.toggle('disabled', !canAfford(this.sim, t.cost)));
@@ -640,7 +647,7 @@ export class BottomPanel {
     const n = this.sim.node(id);
     if (!n) return;
     const def = NODE_DEFS[n.kind];
-    this.info.append(el('div', 'bp-title', def.name));
+    this.header(cmdIconImg(n.kind, 'portrait-img'), def.name, '');
     const amount = el('div', 'bp-line');
     this.info.append(amount);
     this.updaters.push(() => (amount.textContent = `${RESOURCE_NAMES[def.resource]}: ${Math.ceil(n.amount)}`));
@@ -658,7 +665,9 @@ function showTip(anchor: HTMLElement, title: string, effect: string, source: str
     document.body.appendChild(tipEl);
   }
   tipEl.innerHTML = '';
-  tipEl.append(el('div', 'buff-tip-title', title), el('div', 'buff-tip-effect', effect), el('div', 'buff-tip-source', `Fonte: ${source}`));
+  tipEl.append(el('div', 'buff-tip-title', title));
+  if (effect && effect !== title) tipEl.append(el('div', 'buff-tip-effect', effect));
+  if (source) tipEl.append(el('div', 'buff-tip-source', source));
   tipEl.style.display = 'block';
   const r = anchor.getBoundingClientRect();
   const w = tipEl.offsetWidth;
@@ -681,19 +690,27 @@ function el(tag: string, cls: string, text = ''): HTMLElement {
   return e;
 }
 
-function cmdButton(label: string, cost: string, hotkey: string, title: string, onClick: () => void): HTMLButtonElement {
+// Botão de comando no estilo AoE3: um quadrado com ícone (o texto fica escondido e aparece na dica).
+function cmdButton(label: string, cost: string, hotkey: string, title: string, onClick: () => void, icon = 'tech'): HTMLButtonElement {
   const b = document.createElement('button');
   b.className = 'cmd';
-  b.title = title;
+  b.setAttribute('aria-label', label);
   b.innerHTML = `<span class="cmd-label"></span><span class="cmd-cost"></span>${hotkey ? `<span class="cmd-key">${hotkey}</span>` : ''}`;
-  b.querySelector('.cmd-label')!.textContent = label;
-  b.querySelector('.cmd-cost')!.textContent = cost;
+  const labelEl = b.querySelector('.cmd-label')!;
+  const costEl = b.querySelector('.cmd-cost')!;
+  labelEl.textContent = label;
+  costEl.textContent = cost;
+  b.prepend(icon.startsWith('unit:') ? iconImg(icon.slice(5) as UnitKind, 'cmd-icon unit') : cmdIconImg(icon));
+  // A dica lê o texto na hora (o custo e o rótulo podem mudar com o botão aberto).
+  b.onmouseenter = () =>
+    showTip(b, `${labelEl.textContent}${hotkey ? ` (${hotkey})` : ''}`, title, costEl.textContent ? `Custo: ${costEl.textContent}` : '');
+  b.onmouseleave = hideTip;
   b.onclick = onClick;
   return b;
 }
 
-function dangerButton(label: string, hotkey: string, onClick: () => void): HTMLButtonElement {
-  const b = cmdButton(label, '', hotkey, label, onClick);
+function dangerButton(label: string, hotkey: string, onClick: () => void, icon = 'delete'): HTMLButtonElement {
+  const b = cmdButton(label, '', hotkey, label, onClick, icon);
   b.classList.add('danger');
   return b;
 }

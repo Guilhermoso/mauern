@@ -201,7 +201,7 @@ async function boot(): Promise<void> {
     gameOver.classList.remove('hidden');
   };
 
-  ui.append(hud.topbar, hud.paused, minimap.el, bottom.el, hud.log, hud.toasts, debug.el, eraPanel.el, chroniclesPanel.el, eventCard.el, menu.el, gameOver);
+  ui.append(hud.topbar, hud.paused, minimap.el, hud.resPanel, bottom.el, hud.log, hud.toasts, debug.el, eraPanel.el, chroniclesPanel.el, eventCard.el, menu.el, gameOver);
   if (loadWarning) hud.toast(loadWarning);
 
   // Avisos da simulação: notificação clicável (leva a câmera ao local) e som, sem repetir demais.
