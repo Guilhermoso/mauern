@@ -32,6 +32,15 @@ export class OverlayLayer {
     const s = sel.selection;
     const pt0 = () => sel.placementTile();
 
+    // Brilho dourado em volta de todo comandante de batalhão (bônus de liderança).
+    const pulse = 0.25 + 0.15 * Math.sin(performance.now() / 300);
+    for (const bat of sim.state.battalions) {
+      const c = sim.unit(bat.commanderId);
+      if (!c || c.garrison) continue;
+      under.circle(c.x, c.y + 2, 13).fill({ color: 0xffd34d, alpha: pulse * 0.5 });
+      under.circle(c.x, c.y + 2, 10).fill({ color: 0xfff1a8, alpha: pulse * 0.6 });
+    }
+
     // Batalhões selecionados: anel dourado em todos, anel duplo no comandante.
     for (const bid of s.battalions) {
       const b = sim.state.battalions.find((x) => x.id === bid);
@@ -44,6 +53,9 @@ export class OverlayLayer {
         if (id === b.commanderId) under.ellipse(u.x, u.y + 3, r + 8, (r + 8) * 0.6).stroke({ width: line, color: 0xffd34d });
         bar(g, u.x - 9, u.y - r - 10, 18, u.hp / unitMaxHp(sim.state, u), 0x5bd34a);
       }
+      // Alcance da liderança em volta do comandante.
+      const cmd = sim.unit(b.commanderId);
+      if (cmd && !cmd.garrison) under.circle(cmd.x, cmd.y, BALANCE.soldiers.leadershipRadius * ts).stroke({ width: line, color: 0xffd34d, alpha: 0.25 });
       if (b.mode === 'defend' && b.guard) {
         const gx = (b.guard.tx + 0.5) * ts;
         const gy = (b.guard.ty + 0.5) * ts;

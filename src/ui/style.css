@@ -283,3 +283,4 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
 .bp-crit.on { color: #ff6b5c; border-color: #ff6b5c; }
 .bp-hp { color: var(--muted); font-variant-numeric: tabular-nums; }
 .bp-hp.critical { color: #ff6b5c; font-weight: 700; }
+.bp-lead { color: #e8c96a; }

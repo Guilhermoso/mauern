@@ -159,6 +159,8 @@ export const BALANCE = {
     defendRadius: 18, // tiles em volta do ponto de defesa
     huntRadius: 90, // tiles: até onde o batalhão procura titãs
     formationSpacing: 20, // px entre soldados na formação
+    leadershipPerLevel: 0.005, // bônus de comando: +0,5% de ataque e vida por nível do comandante
+    leadershipRadius: 8, // tiles: o bônus só vale perto do comandante
   },
   camera: {
     minZoom: 0.35,

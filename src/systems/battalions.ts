@@ -212,9 +212,30 @@ function pickPatrolPoint(sim: Sim): { tx: number; ty: number } | null {
   return null;
 }
 
+// Vida máxima de cada soldado no último passo: quando o bônus de comando muda (entrou ou saiu do
+// alcance do comandante), a vida atual é ajustada na mesma proporção.
+const lastMaxHp = new WeakMap<Sim, Map<number, number>>();
+
+function syncLeadershipHp(sim: Sim): void {
+  let map = lastMaxHp.get(sim);
+  if (!map) lastMaxHp.set(sim, (map = new Map()));
+  const seen = new Set<number>();
+  for (const u of sim.state.units) {
+    if (!UNIT_DEFS[u.kind].military) continue;
+    seen.add(u.id);
+    const max = unitMaxHp(sim.state, u);
+    const prev = map.get(u.id);
+    if (prev !== undefined && prev !== max && prev > 0) u.hp = Math.min(max, u.hp * (max / prev));
+    else if (u.hp > max) u.hp = max;
+    map.set(u.id, max);
+  }
+  for (const id of map.keys()) if (!seen.has(id)) map.delete(id);
+}
+
 export function updateBattalions(sim: Sim): void {
   const s = sim.state;
   const ts = sim.tileSize;
+  syncLeadershipHp(sim);
   for (const b of [...s.battalions]) {
     b.memberIds = b.memberIds.filter((id) => sim.unit(id));
     let c = sim.unit(b.commanderId);

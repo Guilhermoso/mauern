@@ -226,3 +226,42 @@ describe('batalhões', () => {
     expect(commandTrain(sim, units.map((u) => u.id), f.id)).toMatch(/batalhão/);
   });
 });
+
+describe('liderança do comandante', () => {
+  it('membros perto do comandante ganham +0,5% de ataque e vida por nível dele', () => {
+    const s = flatGame();
+    const sim = new Sim(s);
+    const c = soldier(s, CENTER + 5, CENTER + 5, 20);
+    const m = soldier(s, CENTER + 6, CENTER + 5, 1);
+    const atk0 = unitAttack(s, m);
+    const hp0 = unitMaxHp(s, m);
+    formBattalion(sim, [c.id, m.id]);
+    expect(unitAttack(s, m)).toBeCloseTo(atk0 * (1 + 20 * BALANCE.soldiers.leadershipPerLevel), 5);
+    expect(unitMaxHp(s, m)).toBe(Math.round(hp0 * 1.1));
+    // O comandante não dá bônus a si mesmo.
+    expect(unitAttack(s, c)).toBeCloseTo(unitAttack(s, soldier(s, CENTER, CENTER, 20)), 5);
+  });
+
+  it('longe do comandante, o bônus some', () => {
+    const s = flatGame();
+    const sim = new Sim(s);
+    const c = soldier(s, CENTER + 5, CENTER + 5, 40);
+    const m = soldier(s, CENTER + 6, CENTER + 5, 1);
+    const atk0 = unitAttack(s, m);
+    formBattalion(sim, [c.id, m.id]);
+    m.x += (BALANCE.soldiers.leadershipRadius + 5) * TS;
+    expect(unitAttack(s, m)).toBeCloseTo(atk0, 5);
+  });
+
+  it('ao entrar no alcance, a vida acompanha na mesma proporção', () => {
+    const s = flatGame();
+    const sim = new Sim(s);
+    const c = soldier(s, CENTER + 5, CENTER + 5, 40);
+    const m = soldier(s, CENTER + 6, CENTER + 5, 1);
+    m.hp = unitMaxHp(s, m); // vida cheia
+    runSeconds(sim, 0.1);
+    formBattalion(sim, [c.id, m.id]);
+    runSeconds(sim, 0.1);
+    expect(m.hp).toBeCloseTo(unitMaxHp(s, m), 0);
+  });
+});

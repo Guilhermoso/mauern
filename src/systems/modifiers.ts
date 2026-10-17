@@ -57,14 +57,27 @@ function levelBonus(u: Unit, perLevel: number): number {
   return UNIT_DEFS[u.kind].military ? 1 + perLevel * ((u.level ?? 1) - 1) : 1;
 }
 
+// Bônus de comando: membros de batalhão perto do comandante ficam mais fortes conforme o nível dele.
+// Retorna a fração extra (0,1 = +10%).
+export function leadershipBonus(state: GameState, u: Unit): number {
+  if (!u.battalion) return 0;
+  const b = state.battalions.find((x) => x.id === u.battalion);
+  if (!b || b.commanderId === u.id) return 0;
+  const c = state.units.find((x) => x.id === b.commanderId);
+  if (!c) return 0;
+  const S = BALANCE.soldiers;
+  const inRange = u.garrison && u.garrison === c.garrison ? true : !u.garrison && !c.garrison && Math.hypot(c.x - u.x, c.y - u.y) <= S.leadershipRadius * BALANCE.world.tileSize;
+  return inRange ? c.level * S.leadershipPerLevel : 0;
+}
+
 export function unitMaxHp(state: GameState, u: Unit): number {
   const base = UNIT_DEFS[u.kind].maxHp + (u.kind === 'militia' ? flat(state, 'militiaHp') : 0);
-  return Math.round(base * levelBonus(u, BALANCE.soldiers.hpPerLevel));
+  return Math.round(base * levelBonus(u, BALANCE.soldiers.hpPerLevel) * (1 + leadershipBonus(state, u)));
 }
 
 export function unitAttack(state: GameState, u: Unit): number {
   const base = UNIT_DEFS[u.kind].attack + (u.kind === 'militia' ? flat(state, 'militiaAttack') : 0);
-  return base * levelBonus(u, BALANCE.soldiers.attackPerLevel);
+  return base * levelBonus(u, BALANCE.soldiers.attackPerLevel) * (1 + leadershipBonus(state, u));
 }
 
 export function carryCapacity(state: GameState, u: Unit): number {

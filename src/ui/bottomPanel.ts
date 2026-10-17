@@ -20,7 +20,7 @@ import { rankName, xpToNext, MAX_LEVEL } from '../data/ranks';
 import { isSoldier, setTrainer, trainees, trainer, trainingRate, dismissTraining } from '../systems/soldiers';
 import { battalionCapacity, battalionOf, battalionUnits, disbandBattalion, setAutoHospital, setCommander, setMode, toggleCritical } from '../systems/battalions';
 import { dismissDoctors, doctors, hospitalBeds, patients, startHospitalUpgrade, upgradeCost, upgradeTime } from '../systems/hospital';
-import { unitAttack } from '../systems/modifiers';
+import { leadershipBonus, unitAttack } from '../systems/modifiers';
 import type { Building, Unit, UnitKind } from '../entities/types';
 
 // Painel inferior: informações do que está selecionado e botões de comando.
@@ -297,11 +297,20 @@ export class BottomPanel {
       this.info.append(el('div', 'bp-sub', `Comandante: ${c.name}`));
       this.soldierLines(c);
     }
+    const lead = el('div', 'bp-line bp-lead');
     const size = el('div', 'bp-line');
     const status = el('div', 'bp-line');
-    this.info.append(size, status);
+    this.info.append(lead, size, status);
     this.updaters.push(() => {
       const cmd = this.sim.unit(b.commanderId);
+      const S = BALANCE.soldiers;
+      const pct = cmd ? Math.round(cmd.level * S.leadershipPerLevel * 1000) / 10 : 0;
+      const near = b.memberIds.filter((id) => {
+        const m = this.sim.unit(id);
+        return m && leadershipBonus(this.sim.state, m) > 0;
+      }).length;
+      lead.textContent = `Liderança: +${String(pct).replace('.', ',')}% ataque e vida (${near}/${b.memberIds.length} perto do comandante)`;
+      lead.title = `Soldados a até ${S.leadershipRadius} tiles do comandante recebem +${S.leadershipPerLevel * 100}% por nível dele.`;
       size.textContent = `Soldados: ${b.memberIds.length}/${cmd ? battalionCapacity(cmd.level) : 0} (+ comandante)`;
       const o = b.order;
       const modeText = { manual: 'Sob seu comando', defend: 'Defendendo a posição', hunt: 'Caçando titãs' }[b.mode];

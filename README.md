@@ -28,7 +28,8 @@ treinando no **Campo de Treinamento**: mande soldados para lá e escolha um dele
 o nível do treinador, mais rápido os outros aprendem; ele também ganha experiência ensinando). Forme
 **batalhões** (tecla B com soldados selecionados): o de maior nível comanda, e o nível dele define quantos
 soldados cabem. O batalhão anda em formação, é selecionado como um só e pode ficar no modo manual, defender
-uma posição ou caçar titãs pelo mapa.
+uma posição ou caçar titãs pelo mapa. O comandante dá um **bônus de liderança**: soldados a até 8 tiles dele
+ganham +0,5% de ataque e vida por nível do comandante (nível 20 = +10%, nível 100 = +50%).
 
 **Treino em lotes:** unidades militares treinam em lotes de até 3, como no Age of Empires III — cada clique soma
 uma unidade ao lote, Shift+clique enfileira um lote cheio, e o lote sai junto (mais rápido do que um por um).
