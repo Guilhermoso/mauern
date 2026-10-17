@@ -126,6 +126,8 @@ const MIGRATIONS: Record<number, Migration> = {
     const pois = generatePois(w, save.seed, () => save.nextId++, (x, y) => save.buildings.some((b: any) => Math.abs(b.tx - x) < 6 && Math.abs(b.ty - y) < 6));
     return { ...save, version: 9, memorial: [], pois, explored: initialExplored(w.width, w.height, discs) };
   },
+  // v9 → v10: Era II — muros de pedra viram escombros (campo novo nos edifícios).
+  9: (save) => ({ ...save, version: 10, buildings: save.buildings.map((b: any) => ({ ...b, ruined: false })) }),
 };
 
 export function migrate(save: any): GameState {

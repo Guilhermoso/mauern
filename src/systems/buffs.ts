@@ -1,6 +1,6 @@
 import { BALANCE } from '../data/balance';
 import { CHRONICLES } from '../data/chronicles';
-import { TECH_DEFS, type TechId } from '../data/techs';
+import { TECH_DEFS, type Effects, type ModKey, type TechId } from '../data/techs';
 import type { Sim } from '../core/sim';
 import type { Unit } from '../entities/types';
 import { isFemaleName } from '../entities/names';
@@ -20,6 +20,12 @@ export interface BuffInfo {
   kind: 'gold' | 'blue' | 'green' | 'gray';
 }
 
+const KIND_KEYS: Partial<Record<Unit['kind'], { hp?: ModKey; atk?: ModKey; range?: ModKey }>> = {
+  militia: { hp: 'militiaHp', atk: 'militiaAttack' },
+  spearman: { hp: 'spearmanHp', atk: 'spearmanAttack' },
+  archer: { atk: 'archerAttack', range: 'archerRange' },
+};
+
 const pct = (f: number) => `${String(Math.round(f * 1000) / 10).replace('.', ',')}%`;
 
 export function activeBuffs(sim: Sim, u: Unit): BuffInfo[] {
@@ -38,24 +44,24 @@ export function activeBuffs(sim: Sim, u: Unit): BuffInfo[] {
     });
   }
 
-  // Pesquisas e relíquias que fortalecem os milicianos.
-  if (u.kind === 'militia') {
-    const techs = s.techs.filter((t) => TECH_DEFS[t as TechId] && (TECH_DEFS[t as TechId].effects.militiaHp || TECH_DEFS[t as TechId].effects.militiaAttack));
-    const relics = s.relics.filter((r) => CHRONICLES[r] && (CHRONICLES[r].effects.militiaHp || CHRONICLES[r].effects.militiaAttack));
+  // Pesquisas e relíquias que fortalecem este tipo de unidade.
+  const keys = KIND_KEYS[u.kind];
+  if (keys) {
+    const has = (e: Effects) => !!((keys.hp && e[keys.hp]) || (keys.atk && e[keys.atk]) || (keys.range && e[keys.range]));
+    const techs = s.techs.filter((t) => TECH_DEFS[t as TechId] && has(TECH_DEFS[t as TechId].effects));
+    const relics = s.relics.filter((r) => CHRONICLES[r] && has(CHRONICLES[r].effects));
     if (techs.length || relics.length) {
       let hp = 0;
       let atk = 0;
-      for (const t of techs) {
-        hp += TECH_DEFS[t as TechId].effects.militiaHp ?? 0;
-        atk += TECH_DEFS[t as TechId].effects.militiaAttack ?? 0;
-      }
-      for (const r of relics) {
-        hp += CHRONICLES[r].effects.militiaHp ?? 0;
-        atk += CHRONICLES[r].effects.militiaAttack ?? 0;
+      let range = 0;
+      for (const e of [...techs.map((t) => TECH_DEFS[t as TechId].effects), ...relics.map((r) => CHRONICLES[r].effects)]) {
+        if (keys.hp) hp += e[keys.hp] ?? 0;
+        if (keys.atk) atk += e[keys.atk] ?? 0;
+        if (keys.range) range += e[keys.range] ?? 0;
       }
       out.push({
         id: 'tech', icon: '⚙', name: 'Pesquisas e relíquias', kind: 'gray',
-        effect: [hp ? `+${hp} de vida base` : '', atk ? `+${atk} de ataque base` : ''].filter(Boolean).join(' e '),
+        effect: [hp ? `+${hp} de vida base` : '', atk ? `+${atk} de ataque base` : '', range ? `+${range} de alcance` : ''].filter(Boolean).join(', '),
         source: [...techs.map((t) => TECH_DEFS[t as TechId].name), ...relics.map((r) => CHRONICLES[r].relic ?? CHRONICLES[r].name)].join(', '),
       });
     }

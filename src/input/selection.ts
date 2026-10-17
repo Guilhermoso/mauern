@@ -6,6 +6,7 @@ import type { Camera } from '../render/camera';
 import {
   canAfford,
   deleteEntity,
+  eraLocked,
   lineTiles,
   placeBuilding,
   placeWallLine,
@@ -155,6 +156,11 @@ export class SelectionController {
 
   startPlacing(kind: BuildingKind): void {
     if (this.selectedVillagers().length === 0) return;
+    const locked = eraLocked(this.sim, kind);
+    if (locked) {
+      this.toast(locked);
+      return;
+    }
     if (!canAfford(this.sim, BUILDING_DEFS[kind].cost)) {
       this.toast('Recursos insuficientes.');
       return;

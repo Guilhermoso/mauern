@@ -1,6 +1,6 @@
 import { CHRONICLES, CHRONICLE_IDS } from '../data/chronicles';
 import type { Sim } from '../core/sim';
-import { ERA_NAMES, eraMilestones } from '../systems/era';
+import { ERA_NAMES, ERA_UNLOCKS, advanceEra, eraMilestones } from '../systems/era';
 import { EVENT_DEFS, resolveEvent } from '../systems/events';
 import { rankName } from '../data/ranks';
 import { LORE } from '../data/lore';
@@ -62,6 +62,14 @@ export class EraPanel {
     intro.className = 'muted';
     intro.textContent = `Você está na ${ERA_NAMES[s.era]}. Para a vila evoluir para a ${ERA_NAMES[s.era + 1] ?? '?'}, cumpra todos os marcos abaixo. Não há pressa: cada era tem muito a construir.`;
     this.body.appendChild(intro);
+    if (s.era >= 1) {
+      intro.textContent = `Você está na ${ERA_NAMES[s.era]}. ${ERA_UNLOCKS[s.era]}`;
+      const note = document.createElement('p');
+      note.className = 'muted small';
+      note.textContent = `Os marcos para a ${ERA_NAMES[s.era + 1]} chegam numa próxima atualização, junto com o resto da Era II (cadeias de produção, novas necessidades, estábulo e mais). Seu progresso fica guardado.`;
+      this.body.appendChild(note);
+      return;
+    }
     const list = document.createElement('ul');
     list.className = 'checklist';
     const ms = eraMilestones(this.sim);
@@ -76,14 +84,17 @@ export class EraPanel {
     this.body.appendChild(list);
     const btn = document.createElement('button');
     btn.className = 'era-btn';
-    btn.disabled = true;
     const all = ms.every((m) => m.done);
-    btn.textContent = all ? 'Avançar para a Era II (em breve)' : 'Avançar para a Era II';
-    btn.title = 'A Era II chega numa próxima atualização do jogo.';
+    btn.disabled = !all;
+    btn.textContent = `Avançar para a ${ERA_NAMES[s.era + 1]}`;
+    btn.title = all ? 'Todos os marcos cumpridos!' : 'Cumpra todos os marcos para avançar.';
+    btn.onclick = () => {
+      if (!advanceEra(this.sim)) this.render();
+    };
     this.body.appendChild(btn);
     const note = document.createElement('p');
     note.className = 'muted small';
-    note.textContent = 'A Era II — Vila (muros de pedra, quartel, arqueiros, cadeias de produção) está sendo construída e chega numa próxima atualização. Seu progresso fica guardado.';
+    note.textContent = `Na ${ERA_NAMES[s.era + 1]}: ${ERA_UNLOCKS[s.era + 1]}`;
     this.body.appendChild(note);
   }
 }
@@ -248,7 +259,7 @@ export class MemorialPanel {
     for (const m of [...list].reverse()) {
       const row = document.createElement('div');
       row.className = `memorial-row ${m.noble ? 'noble' : ''}`;
-      const military = m.kind === 'militia';
+      const military = UNIT_DEFS[m.kind].military && m.kind !== 'scout';
       const who = `${m.noble ? '♛ ' : ''}${m.name}`;
       const what = military ? `${rankName(m.level)} · ${m.kills} titãs` : UNIT_DEFS[m.kind].name;
       row.innerHTML = '<span class="m-name"></span><span class="m-what"></span><span class="m-cause"></span><span class="m-day"></span>';

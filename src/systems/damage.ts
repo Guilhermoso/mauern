@@ -47,6 +47,16 @@ export function damageBuilding(sim: Sim, b: Building, amount: number): void {
   b.hp -= amount;
   if (b.hp <= 0) {
     const def = BUILDING_DEFS[b.kind];
+    // Muros e portões de pedra não somem: viram escombro, que os aldeões reconstroem.
+    if (def.rubble && b.built) {
+      sim.ruinBuilding(b);
+      const ts = sim.tileSize;
+      const c = { x: (b.tx + def.size / 2) * ts, y: (b.ty + def.size / 2) * ts };
+      sim.fx.push({ type: 'dust', x: c.x, y: c.y, size: def.size * ts });
+      const text = `Um trecho de ${def.name.toLowerCase()} desabou! Mande aldeões reconstruir os escombros.`;
+      sim.alerts.push({ kind: 'destroyed', text, x: c.x, y: c.y });
+      return;
+    }
     const text = buildingMessage(def, 'destruído pelos titãs', 'destruída pelos titãs');
     // Segmentos de muralha não enchem o diário um por um: o aviso de ataque já chama a atenção.
     if (!def.wall) addLog(sim.state, text);

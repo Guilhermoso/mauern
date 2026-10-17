@@ -263,6 +263,41 @@ const DRAW: Record<string, (ctx: Ctx) => void> = {
     cross(c, 32, 38, 10);
   },
 
+  // Era II
+  barracks: (c) => {
+    rect(c, 8, 26, 48, 26, '#8a7650');
+    poly(c, [4, 28, 32, 12, 60, 28], '#7a3a2a');
+    spear(c, 22, 40);
+    spear(c, 42, 40);
+  },
+  archeryRange: (c) => {
+    circle(c, 32, 32, 22, '#e8d8a0', '#8a7040', 2);
+    circle(c, 32, 32, 15, '#c8283c', '', 0);
+    circle(c, 32, 32, 9, '#e8d8a0', '', 0);
+    circle(c, 32, 32, 4, '#c8283c', '', 0);
+    line(c, [44, 14, 33, 31], WOOD, 3);
+    poly(c, [44, 14, 52, 10, 48, 18], '#e8e0c8', '', 0);
+  },
+  stoneWall: (c) => {
+    for (let row = 0; row < 3; row++) {
+      for (let i = 0; i < 3; i++) rect(c, 6 + i * 18 - (row % 2) * 9, 18 + row * 12, 18, 12, '#9a958a', '#4e4a44', 1.5);
+    }
+    rect(c, 6, 10, 52, 8, '#b3ada2', '#4e4a44', 1.5);
+  },
+  stoneGate: (c) => {
+    rect(c, 4, 14, 14, 42, '#9a958a', '#4e4a44', 2);
+    rect(c, 46, 14, 14, 42, '#9a958a', '#4e4a44', 2);
+    rect(c, 18, 24, 28, 32, '#6b4426', '#2a1a0a', 2);
+    line(c, [18, 34, 46, 34], '#3a3a3a', 3);
+    line(c, [18, 46, 46, 46], '#3a3a3a', 3);
+    rect(c, 4, 8, 56, 8, '#b3ada2', '#4e4a44', 1.5);
+  },
+  stoneTower: (c) => {
+    rect(c, 18, 18, 28, 40, '#9a958a', '#4e4a44', 2);
+    for (let i = 0; i < 4; i++) rect(c, 16 + i * 9, 8, 6, 10, '#b3ada2', '#4e4a44', 1.5);
+    rect(c, 28, 34, 8, 12, '#2a2a2a', '', 0);
+  },
+
   // --- Ações ---
   stop: (c) => {
     // mão aberta

@@ -24,6 +24,8 @@ export interface BuildingDef {
   garrison: number; // quantas unidades podem se abrigar dentro
   hospital?: boolean; // recebe soldados feridos (leitos pelo nível) e médicos
   attack?: BuildingAttack; // edifícios que atiram flechas nos titãs
+  era?: number; // era em que é liberado (0 = Era I)
+  rubble?: boolean; // destruído, vira escombro consertável em vez de sumir
 }
 
 export interface BuildingAttack {
@@ -128,6 +130,43 @@ export const BUILDING_DEFS: Record<BuildingKind, BuildingDef> = {
     size: 4, maxHp: 800, housing: 0, cost: { wood: 150, stone: 40 }, buildTime: 40,
     dropsite: [], walkable: true, trains: [], hotkey: 'KeyY', garrison: 0,
   },
+  // --- Era II ---
+  barracks: {
+    name: 'Quartel',
+    feminine: false,
+    description: 'Treina lanceiros, a infantaria pesada da Era II, e pesquisa melhorias militares.',
+    size: 3, maxHp: 1400, housing: 0, cost: { wood: 200, stone: 100 }, buildTime: 60,
+    dropsite: [], walkable: false, trains: ['spearman'], hotkey: 'KeyK', garrison: 0, era: 1,
+  },
+  archeryRange: {
+    name: 'Campo de Arqueiros',
+    feminine: false,
+    description: 'Treina arqueiros, que atacam os titãs de longe. Arqueiros dentro de torres dão muito mais dano.',
+    size: 3, maxHp: 1100, housing: 0, cost: { wood: 220, stone: 60 }, buildTime: 55,
+    dropsite: [], walkable: false, trains: ['archer'], hotkey: 'KeyJ', garrison: 0, era: 1,
+  },
+  stoneWall: {
+    name: 'Muro de Pedra',
+    feminine: false,
+    description: 'Muito mais forte que a paliçada. Arraste para construir — pode ser posto por cima da paliçada. Destruído, vira escombro que os aldeões reconstroem.',
+    size: 1, maxHp: 1600, housing: 0, cost: { stone: 6 }, buildTime: 10,
+    dropsite: [], walkable: false, trains: [], hotkey: 'KeyM', wall: true, garrison: 0, era: 1, rubble: true,
+  },
+  stoneGate: {
+    name: 'Portão de Pedra',
+    feminine: false,
+    description: 'Passagem no muro de pedra. Pode ser posto sobre muros e paliçadas. Destruído, vira escombro.',
+    size: 1, maxHp: 2000, housing: 0, cost: { stone: 30 }, buildTime: 16,
+    dropsite: [], walkable: false, trains: [], hotkey: 'KeyN', gate: true, garrison: 0, era: 1, rubble: true,
+  },
+  stoneTower: {
+    name: 'Torre de Pedra',
+    feminine: true,
+    description: 'Torre alta que atira longe. Arqueiros abrigados dentro multiplicam o dano.',
+    size: 2, maxHp: 2200, housing: 0, cost: { wood: 50, stone: 150 }, buildTime: 60,
+    dropsite: [], walkable: false, trains: [], hotkey: 'KeyO', garrison: 8, era: 1,
+    attack: { damage: 8, cooldown: 1.6, range: 9, needsGarrison: false, damagePerGarrison: 1.5 },
+  },
   bonfire: {
     name: 'Fogueira Comunitária',
     feminine: true,
@@ -138,7 +177,10 @@ export const BUILDING_DEFS: Record<BuildingKind, BuildingDef> = {
 };
 
 // Ordem dos botões no menu de construção do aldeão.
-export const VILLAGER_BUILDS: BuildingKind[] = ['house', 'well', 'bonfire', 'lumberCamp', 'miningCamp', 'mill', 'farm', 'palisade', 'gate', 'watchTower', 'trainingGround', 'refuge', 'hospital'];
+export const VILLAGER_BUILDS: BuildingKind[] = [
+  'house', 'well', 'bonfire', 'lumberCamp', 'miningCamp', 'mill', 'farm', 'palisade', 'gate', 'watchTower', 'trainingGround', 'refuge', 'hospital',
+  'barracks', 'archeryRange', 'stoneWall', 'stoneGate', 'stoneTower',
+];
 
 export interface UnitDef {
   name: string;
@@ -156,6 +198,8 @@ export interface UnitDef {
   autoAttack: boolean; // ataca sozinho titãs que chegam perto
   military: boolean;
   hotkey: string; // tecla para treinar no edifício
+  range?: number; // ataque à distância: alcance em tiles (arqueiros)
+  era?: number; // era em que é liberada (0 = Era I)
 }
 
 export const UNIT_DEFS: Record<UnitKind, UnitDef> = {
@@ -173,6 +217,16 @@ export const UNIT_DEFS: Record<UnitKind, UnitDef> = {
     name: 'Miliciano', nameFeminine: 'Miliciana', maxHp: 60, radius: 7, speed: 55, cost: { food: 40, wood: 25 }, trainTime: 25,
     canGather: false, canBuild: false, carryCapacity: 0, attack: 7, attackCooldown: 1.5, autoAttack: true, military: true,
     hotkey: 'KeyE',
+  },
+  spearman: {
+    name: 'Lanceiro', nameFeminine: 'Lanceira', maxHp: 95, radius: 7, speed: 56, cost: { food: 60, wood: 30, iron: 15 }, trainTime: 30,
+    canGather: false, canBuild: false, carryCapacity: 0, attack: 11, attackCooldown: 1.4, autoAttack: true, military: true,
+    hotkey: 'KeyE', era: 1,
+  },
+  archer: {
+    name: 'Arqueiro', nameFeminine: 'Arqueira', maxHp: 45, radius: 7, speed: 54, cost: { food: 40, wood: 45 }, trainTime: 28,
+    canGather: false, canBuild: false, carryCapacity: 0, attack: 6, attackCooldown: 1.8, autoAttack: true, military: true,
+    hotkey: 'KeyE', range: 6, era: 1,
   },
 };
 

@@ -75,10 +75,60 @@ function horse(ctx: CanvasRenderingContext2D): void {
   ctx.restore();
 }
 
+// Lanceiro: lança longa e escudo redondo.
+function spearAndShield(ctx: CanvasRenderingContext2D): void {
+  spear(ctx);
+  ctx.save();
+  ctx.translate(SIZE / 2 - 8, SIZE / 2 + 8);
+  ctx.beginPath();
+  ctx.arc(0, 0, 11, 0, Math.PI * 2);
+  ctx.fillStyle = '#b5452e';
+  ctx.fill();
+  ctx.lineWidth = 2.5;
+  ctx.strokeStyle = '#e8c24a';
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.arc(0, 0, 3, 0, Math.PI * 2);
+  ctx.fillStyle = '#e8c24a';
+  ctx.fill();
+  ctx.restore();
+}
+
+// Arqueiro: arco e flecha.
+function bow(ctx: CanvasRenderingContext2D): void {
+  ctx.save();
+  ctx.translate(SIZE / 2, SIZE / 2);
+  ctx.rotate(-Math.PI / 4);
+  ctx.beginPath();
+  ctx.arc(-6, 0, 20, -Math.PI / 2.4, Math.PI / 2.4);
+  ctx.lineWidth = 4;
+  ctx.strokeStyle = '#8b5e34';
+  ctx.stroke();
+  const ex = -6 + Math.cos(Math.PI / 2.4) * 20;
+  const ey = Math.sin(Math.PI / 2.4) * 20;
+  ctx.beginPath();
+  ctx.moveTo(ex, -ey);
+  ctx.lineTo(ex, ey);
+  ctx.lineWidth = 1.2;
+  ctx.strokeStyle = '#e8e0c8';
+  ctx.stroke();
+  ctx.fillStyle = '#c9ced3';
+  ctx.fillRect(-14, -1.5, 30, 3);
+  ctx.beginPath();
+  ctx.moveTo(22, 0);
+  ctx.lineTo(14, -5);
+  ctx.lineTo(14, 5);
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+}
+
 const SYMBOLS: Record<UnitKind, (ctx: CanvasRenderingContext2D) => void> = {
   villager: hammer,
   militia: spear,
   scout: horse,
+  spearman: spearAndShield,
+  archer: bow,
 };
 
 export function unitIcon(kind: UnitKind): string {

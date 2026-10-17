@@ -22,7 +22,11 @@ export type ModKey =
   | 'militiaHp' // flat
   | 'taxes'
   | 'morale' // flat
-  | 'wellRadius'; // flat, em tiles
+  | 'wellRadius' // flat, em tiles
+  | 'spearmanAttack' // flat
+  | 'spearmanHp' // flat
+  | 'archerAttack' // flat
+  | 'archerRange'; // flat, em tiles
 
 export type Effects = Partial<Record<ModKey, number>>;
 
@@ -49,7 +53,13 @@ export type TechId =
   | 'militiaDrill'
   | 'sentinels'
   | 'hearths'
-  | 'buildingTools';
+  | 'buildingTools'
+  // Era II
+  | 'pikeDrill'
+  | 'ironShields'
+  | 'longbows'
+  | 'fletching'
+  | 'masonry';
 
 export const TECH_DEFS: Record<TechId, TechDef> = {
   sharpAxes: {
@@ -99,6 +109,27 @@ export const TECH_DEFS: Record<TechId, TechDef> = {
   sentinels: {
     name: 'Sentinelas', description: 'Torres atiram 2 tiles mais longe.',
     building: 'watchTower', cost: { food: 150, wood: 150, stone: 50 }, time: 240, effects: { towerRange: 2 }, era: 0,
+  },
+  // --- Era II ---
+  pikeDrill: {
+    name: 'Treino de Piques', description: 'Lanceiros com +4 de ataque.',
+    building: 'barracks', cost: { food: 250, iron: 80, gold: 40 }, time: 360, effects: { spearmanAttack: 4 }, era: 1,
+  },
+  ironShields: {
+    name: 'Escudos de Ferro', description: 'Lanceiros com +35 de vida.',
+    building: 'barracks', cost: { wood: 150, iron: 120 }, time: 360, effects: { spearmanHp: 35 }, era: 1,
+  },
+  longbows: {
+    name: 'Arcos Longos', description: 'Arqueiros atiram 2 tiles mais longe.',
+    building: 'archeryRange', cost: { wood: 250, gold: 60 }, time: 360, effects: { archerRange: 2 }, era: 1,
+  },
+  fletching: {
+    name: 'Penas de Flecha', description: 'Arqueiros com +3 de ataque; torres com +2 de dano por flecha.',
+    building: 'archeryRange', cost: { food: 150, wood: 200, gold: 40 }, time: 300, effects: { archerAttack: 3, arrowDamage: 2 }, era: 1,
+  },
+  masonry: {
+    name: 'Alvenaria', description: 'Muralhas, portões e torres 40% mais resistentes.',
+    building: 'miningCamp', cost: { stone: 300, gold: 50 }, time: 420, effects: { wallHp: 0.4 }, era: 1,
   },
 };
 

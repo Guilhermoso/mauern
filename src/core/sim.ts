@@ -142,15 +142,34 @@ export class Sim {
 
   occupyBuilding(b: Building): void {
     const def = BUILDING_DEFS[b.kind];
-    // Portões e fazendas não bloqueiam os humanos.
-    if (!def.walkable && !def.gate) this.nav.occupy(b.tx, b.ty, def.size, def.size);
+    // Portões, fazendas e escombros não bloqueiam os humanos.
+    if (!def.walkable && !def.gate && !b.ruined) this.nav.occupy(b.tx, b.ty, def.size, def.size);
     this.fillGrid(b, b.id);
+  }
+
+  // Muro/portão de pedra derrubado vira escombro: continua no mapa, mas deixa de bloquear a passagem.
+  ruinBuilding(b: Building): void {
+    const def = BUILDING_DEFS[b.kind];
+    if (b.ruined) return;
+    if (!def.walkable && !def.gate) this.nav.release(b.tx, b.ty, def.size, def.size);
+    b.ruined = true;
+    b.built = false;
+    b.progress = 0;
+    b.hp = 0;
+  }
+
+  // Escombro reconstruído: volta a bloquear.
+  restoreBuilding(b: Building): void {
+    const def = BUILDING_DEFS[b.kind];
+    if (!b.ruined) return;
+    b.ruined = false;
+    if (!def.walkable && !def.gate) this.nav.occupy(b.tx, b.ty, def.size, def.size);
   }
 
   releaseBuilding(b: Building): void {
     this.buildingIndex.delete(b.id);
     const def = BUILDING_DEFS[b.kind];
-    if (!def.walkable && !def.gate) this.nav.release(b.tx, b.ty, def.size, def.size);
+    if (!def.walkable && !def.gate && !b.ruined) this.nav.release(b.tx, b.ty, def.size, def.size);
     this.fillGrid(b, 0);
   }
 

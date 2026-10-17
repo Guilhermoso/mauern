@@ -21,7 +21,11 @@ const HAIR = [0x2b1d14, 0x14110f, 0x6b4a2a, 0xc9a45c];
 
 export function createTitanView(t: Titan): TitanView {
   const R = titanRadius(t.height);
-  const skin = lerpColor(0xefd2bb, 0xc8977a, t.skin);
+  // Anormal: pele acinzentada, braços compridos, cabeça grande e um sorriso largo.
+  const ab = t.kind === 'abnormal';
+  const skin = ab ? lerpColor(0xd8cfc4, 0xa8988a, t.skin) : lerpColor(0xefd2bb, 0xc8977a, t.skin);
+  const armLen = ab ? 1.4 : 0.95;
+  const headR = ab ? 0.52 : 0.42;
   const hair = HAIR[Math.floor(t.skin * 997) % HAIR.length];
   const root = new Container();
   const shadow = new Graphics();
@@ -30,8 +34,8 @@ export function createTitanView(t: Titan): TitanView {
 
   const arm = (side: number) => {
     const g = new Graphics();
-    g.roundRect(0, -R * 0.15, R * 0.95, R * 0.3, R * 0.15).fill(shade(skin, 0.92)).stroke({ width: Math.max(1, R * 0.04), color: shade(skin, 0.6) });
-    g.circle(R * 0.95, 0, R * 0.19).fill(shade(skin, 0.86)); // mão
+    g.roundRect(0, -R * 0.15, R * armLen, R * 0.3, R * 0.15).fill(shade(skin, 0.92)).stroke({ width: Math.max(1, R * 0.04), color: shade(skin, 0.6) });
+    g.circle(R * armLen, 0, R * 0.19).fill(shade(skin, 0.86)); // mão
     g.position.set(0, side * R * 0.82);
     return g;
   };
@@ -42,11 +46,15 @@ export function createTitanView(t: Titan): TitanView {
   torso.ellipse(0, 0, R * 0.5, R * 0.95).fill(skin).stroke({ width: Math.max(1, R * 0.05), color: shade(skin, 0.6) });
   torso.ellipse(-R * 0.08, 0, R * 0.32, R * 0.7).fill(shade(skin, 0.94));
   const head = new Graphics();
-  head.circle(R * 0.08, 0, R * 0.42).fill(skin).stroke({ width: Math.max(1, R * 0.04), color: shade(skin, 0.6) });
-  head.circle(-R * 0.04, 0, R * 0.38).fill(hair);
+  head.circle(R * 0.08, 0, R * headR).fill(skin).stroke({ width: Math.max(1, R * 0.04), color: shade(skin, 0.6) });
+  head.circle(-R * 0.04, 0, R * (headR - 0.04)).fill(hair);
   head.ellipse(R * 0.26, 0, R * 0.17, R * 0.27).fill(skin);
-  head.circle(R * 0.34, -R * 0.11, R * 0.045).fill(0x2a1a12); // olhos
-  head.circle(R * 0.34, R * 0.11, R * 0.045).fill(0x2a1a12);
+  head.circle(R * 0.34, -R * 0.11, R * (ab ? 0.065 : 0.045)).fill(ab ? 0x111111 : 0x2a1a12); // olhos
+  head.circle(R * 0.34, R * 0.11, R * (ab ? 0.065 : 0.045)).fill(ab ? 0x111111 : 0x2a1a12);
+  if (ab) {
+    // Sorriso de orelha a orelha.
+    head.arc(R * 0.3, 0, R * 0.2, -1.2, 1.2).stroke({ width: Math.max(1, R * 0.05), color: 0x5a1a1a });
+  }
 
   body.addChild(armL, armR, torso, head);
   root.addChild(shadow, body);

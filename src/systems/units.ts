@@ -287,12 +287,14 @@ function updateBuild(sim: Sim, u: Unit, buildingId: number): void {
     return;
   }
   b.progress = Math.min(def.buildTime, b.progress + DT * speed);
-  b.hp = Math.max(1, Math.round(maxHp * (b.progress / def.buildTime)));
+  // A vida acompanha a obra (mas um muro que substituiu uma paliçada mantém a vida dela até a obra passar disso).
+  b.hp = Math.max(1, b.hp, Math.round(maxHp * (b.progress / def.buildTime)));
   if (b.progress >= def.buildTime) completeBuilding(sim, b);
 }
 
 export function completeBuilding(sim: Sim, b: Building): void {
   b.built = true;
+  sim.restoreBuilding(b);
   const def = BUILDING_DEFS[b.kind];
   b.hp = buildingMaxHp(sim.state, b);
   // Segmentos de muralha não vão para o diário, um por um.

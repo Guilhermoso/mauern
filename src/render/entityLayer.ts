@@ -79,14 +79,14 @@ export class EntityLayer {
       const p = b.built ? 1 : b.progress / def.buildTime;
       const mask = def.wall || def.gate ? wallMask(sim, b) : 0;
       const open = def.gate ? isGateOpen(sim, b) : false;
-      const key = `${b.built}|${Math.floor(p * 10)}|${mask}|${b.level}|${open}`;
+      const key = `${b.built}|${Math.floor(p * 10)}|${mask}|${b.level}|${open}|${b.ruined}`;
       let v = this.buildings.get(b.id);
       if (!v || v.key !== key) {
         if (v) {
           v.art.root.destroy({ children: true });
           v.shadow?.destroy();
         }
-        const art = drawBuildingArt(b.kind, b.built, p, mask, b.level, open);
+        const art = drawBuildingArt(b.kind, b.built, p, mask, b.level, open, b.ruined);
         let shadow: Graphics | null = null;
         if (art.casters?.length) {
           shadow = new Graphics();
@@ -243,6 +243,11 @@ function wallMask(sim: Sim, b: Building): number {
   return mask;
 }
 
+// Soldados a pé (podem receber título e montar a cavalo, e mostram escudo e aura de lenda).
+function isFootSoldier(kind: Unit['kind']): boolean {
+  return kind === 'militia' || kind === 'spearman' || kind === 'archer';
+}
+
 function createUnitView(u: Unit): UnitView {
   const root = new Container();
   const body = new Graphics();
@@ -257,7 +262,7 @@ function createUnitView(u: Unit): UnitView {
     tool.rect(0, -1, 9, 2).fill(0x6b4a2a);
     tool.rect(7, -3, 3, 6).fill(0x9aa0a6);
     tool.visible = false;
-  } else if (u.kind === 'militia' && u.noble) {
+  } else if (isFootSoldier(u.kind) && u.noble) {
     // Nobre: montado a cavalo (desenhado em "mount", que gira com a direção) e com lança dourada.
     body.circle(0, -2, 6.5).fill(PLAYER_COLOR);
     body.circle(0, -2, 6.5).stroke({ width: 1.4, color: 0xd9a441 });
@@ -274,6 +279,25 @@ function createUnitView(u: Unit): UnitView {
     // Lança
     tool.rect(-4, -1, 18, 1.6).fill(0x6b4a2a);
     tool.poly([14, -3, 19, 0, 14, 3]).fill(0xc9ced3);
+  } else if (u.kind === 'spearman') {
+    // Lanceiro: elmo de aço com penacho vermelho, escudo redondo e lança longa.
+    body.ellipse(2, 5, 7.5, 4).fill({ color: 0x000000, alpha: 0.3 });
+    body.circle(0, 0, 7.5).fill(PLAYER_COLOR);
+    body.circle(0, 0, 7.5).stroke({ width: 1.4, color: 0x14295a });
+    body.circle(0, -1, 4).fill(0xb8bec4);
+    body.rect(-1, -7, 2, 4).fill(0xc8283c); // penacho
+    body.circle(-5, 3, 4.2).fill(0xb5452e).stroke({ width: 1, color: 0xe8c24a }); // escudo
+    tool.rect(-6, -1, 24, 1.8).fill(0x5a3d22);
+    tool.poly([18, -3.4, 24, 0, 18, 3.4]).fill(0xd8dde2);
+  } else if (u.kind === 'archer') {
+    // Arqueiro: capuz verde e arco.
+    body.ellipse(2, 5, 6.5, 3.6).fill({ color: 0x000000, alpha: 0.3 });
+    body.circle(0, 0, 6.5).fill(PLAYER_COLOR);
+    body.circle(0, 0, 6.5).stroke({ width: 1.2, color: 0x1d3a78 });
+    body.circle(0, -1, 3.8).fill(0x4f7a3a); // capuz
+    body.circle(0.6, -0.4, 2).fill(0xe8c39e);
+    tool.arc(4, 0, 8, -1.1, 1.1).stroke({ width: 1.8, color: 0x8b5e34 });
+    tool.moveTo(4 + Math.cos(-1.1) * 8, Math.sin(-1.1) * 8).lineTo(4 + Math.cos(1.1) * 8, Math.sin(1.1) * 8).stroke({ width: 0.8, color: 0xe8e0c8 });
   } else {
     body.ellipse(3, 6, 13, 6).fill({ color: 0x000000, alpha: 0.3 });
     body.ellipse(0, 0, 12, 5.5).fill(0x6b4426);
@@ -283,7 +307,7 @@ function createUnitView(u: Unit): UnitView {
   }
   const badge = new Graphics();
   const mount = new Graphics();
-  if (u.kind === 'militia' && u.noble) {
+  if (isFootSoldier(u.kind) && u.noble) {
     mount.ellipse(3, 6, 14, 6).fill({ color: 0x000000, alpha: 0.3 });
     mount.ellipse(0, 0, 13, 6).fill(0xf2efe6); // cavalo branco
     mount.ellipse(0, 0, 13, 6).stroke({ width: 1, color: 0x9a948a });
@@ -344,13 +368,13 @@ function updateUnitView(v: UnitView, u: Unit, timeSec: number, commander = false
     v.body.rotation = u.facing;
     return;
   }
-  if (u.kind === 'militia') {
+  if (isFootSoldier(u.kind)) {
     v.mount.rotation = u.facing;
     v.glow.visible = u.level >= 100;
     if (v.glow.visible) v.glow.alpha = 0.6 + Math.sin(timeSec * 3 + u.id) * 0.3;
     v.shield.visible = u.shield > 0;
-    // A lança aponta para a frente e estoca durante o combate.
-    const thrust = working ? Math.max(0, Math.sin(timeSec * 8 + u.id)) * 5 : 0;
+    // A lança aponta para a frente e estoca durante o combate (o arco só recua um pouco ao atirar).
+    const thrust = working ? Math.max(0, Math.sin(timeSec * 8 + u.id)) * (u.kind === 'archer' ? -2 : 5) : 0;
     v.tool.rotation = u.facing;
     v.tool.position.set(Math.cos(u.facing) * thrust, Math.sin(u.facing) * thrust);
     return;

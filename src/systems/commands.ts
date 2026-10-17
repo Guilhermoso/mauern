@@ -7,6 +7,7 @@ import { TILE_INFO } from '../world/terrain';
 import { getTile } from '../world/world';
 import { farmTaken, findNearestNode, gathererCounts, isExposed } from './queries';
 import { isVisible } from './fog';
+import { ERA_NAMES } from './era';
 import { buildingMaxHp } from './modifiers';
 import { commandTrain } from './soldiers';
 import { commandHospital } from './hospital';
@@ -214,6 +215,30 @@ export function smartCommand(sim: Sim, ids: readonly number[], wx: number, wy: n
   return null;
 }
 
+// Edifícios que podem ser postos por cima de outro (o antigo é substituído):
+// portões sobre paliçada; muro de pedra sobre paliçada; portão de pedra sobre paliçada, portão ou muro.
+export function canReplace(kind: BuildingKind, existing: Building): boolean {
+  if (existing.ruined) return false; // escombro se reconstrói (clique direito com aldeões)
+  if (kind === 'stoneWall') return existing.kind === 'palisade';
+  if (kind === 'stoneGate') return existing.kind === 'palisade' || existing.kind === 'gate' || existing.kind === 'stoneWall';
+  return BUILDING_DEFS[kind].gate === true && existing.kind === 'palisade';
+}
+
+export function eraLocked(sim: Sim, kind: BuildingKind): string | null {
+  const era = BUILDING_DEFS[kind].era ?? 0;
+  return era > sim.state.era ? `Disponível na ${ERA_NAMES[era]}.` : null;
+}
+
+// Põe o novo edifício no lugar do antigo; a obra começa com a vida do que havia ali, para não abrir
+// uma brecha enquanto a paliçada vira pedra.
+function replaceAt(sim: Sim, kind: BuildingKind, tx: number, ty: number): number {
+  const old = sim.buildingAt(tx, ty);
+  if (!old || !canReplace(kind, old)) return 0;
+  const hp = old.built ? old.hp : 0;
+  removeBuilding(sim, old);
+  return hp;
+}
+
 export function canPlace(sim: Sim, kind: BuildingKind, tx: number, ty: number): string | null {
   const size = BUILDING_DEFS[kind].size;
   for (let y = ty; y < ty + size; y++) {
@@ -222,8 +247,7 @@ export function canPlace(sim: Sim, kind: BuildingKind, tx: number, ty: number): 
       if (!TILE_INFO[getTile(sim.state.world, x, y)].buildable) return 'Terreno impróprio para construir.';
       if (sim.nodeAt(x, y)) return 'Há recursos no caminho.';
       const existing = sim.buildingAt(x, y);
-      // Portões podem substituir um segmento de paliçada.
-      if (existing && !(BUILDING_DEFS[kind].gate && existing.kind === 'palisade')) return 'Já existe uma construção aqui.';
+      if (existing && !canReplace(kind, existing)) return 'Já existe uma construção aqui.';
     }
   }
   return null;
@@ -237,15 +261,15 @@ export function placeBuilding(
   builderIds: readonly number[],
 ): { building?: Building; error?: string } {
   const def = BUILDING_DEFS[kind];
+  const locked = eraLocked(sim, kind);
+  if (locked) return { error: locked };
   if (!canAfford(sim, def.cost)) return { error: 'Recursos insuficientes.' };
   const err = canPlace(sim, kind, tx, ty);
   if (err) return { error: err };
   pay(sim, def.cost);
-  if (def.gate) {
-    const old = sim.buildingAt(tx, ty);
-    if (old) removeBuilding(sim, old);
-  }
+  const inherited = def.size === 1 ? replaceAt(sim, kind, tx, ty) : 0;
   const b = newBuilding(sim.nextId(), kind, tx, ty, false);
+  if (inherited) b.hp = inherited;
   sim.state.buildings.push(b);
   sim.occupyBuilding(b);
   commandBuild(sim, builderIds, b.id);
@@ -290,6 +314,7 @@ export function placeWallLine(
   builderIds: readonly number[],
 ): number {
   const def = BUILDING_DEFS[kind];
+  if (eraLocked(sim, kind)) return 0;
   let placed = 0;
   const tiles = lineTiles(x0, y0, x1, y1);
   // Os construtores começam pela ponta mais próxima deles.
@@ -304,7 +329,9 @@ export function placeWallLine(
     if (!canAfford(sim, def.cost)) break;
     if (canPlace(sim, kind, tx, ty)) continue;
     pay(sim, def.cost);
+    const inherited = replaceAt(sim, kind, tx, ty);
     const b = newBuilding(sim.nextId(), kind, tx, ty, false);
+    if (inherited) b.hp = inherited;
     sim.state.buildings.push(b);
     sim.occupyBuilding(b);
     if (placed === 0) commandBuild(sim, builderIds, b.id);
@@ -320,6 +347,7 @@ export function trainUnit(sim: Sim, buildingId: number, kind: UnitKind, fullBatc
   const b = sim.building(buildingId);
   if (!b || !b.built) return 'Edifício indisponível.';
   if (!BUILDING_DEFS[b.kind].trains.includes(kind)) return 'Este edifício não treina esta unidade.';
+  if ((UNIT_DEFS[kind].era ?? 0) > sim.state.era) return `Disponível na ${ERA_NAMES[UNIT_DEFS[kind].era ?? 0]}.`;
   const cost = UNIT_DEFS[kind].cost;
   if (!canAfford(sim, cost)) return 'Recursos insuficientes.';
   const maxBatch = UNIT_DEFS[kind].military ? BALANCE.units.maxBatch : 1;

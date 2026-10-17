@@ -146,8 +146,13 @@ export function buffFraction(state: GameState, u: Unit): number {
   return leadershipBonus(state, u) + a.noble + a.legend + honorBonus(u);
 }
 
+// Bônus fixos de pesquisas e relíquias por tipo de unidade.
+const KIND_HP: Partial<Record<Unit['kind'], ModKey>> = { militia: 'militiaHp', spearman: 'spearmanHp' };
+const KIND_ATTACK: Partial<Record<Unit['kind'], ModKey>> = { militia: 'militiaAttack', spearman: 'spearmanAttack', archer: 'archerAttack' };
+
 export function unitBaseHp(state: GameState, u: Unit): number {
-  const extra = (u.kind === 'militia' ? flat(state, 'militiaHp') : 0) + (u.noble ? BALANCE.nobility.extraHp : 0);
+  const hpKey = KIND_HP[u.kind];
+  const extra = (hpKey ? flat(state, hpKey) : 0) + (u.noble ? BALANCE.nobility.extraHp : 0);
   return (UNIT_DEFS[u.kind].maxHp + extra) * levelBonus(u, BALANCE.soldiers.hpPerLevel);
 }
 
@@ -156,7 +161,8 @@ export function unitMaxHp(state: GameState, u: Unit): number {
 }
 
 export function unitAttack(state: GameState, u: Unit): number {
-  const extra = (u.kind === 'militia' ? flat(state, 'militiaAttack') : 0) + (u.noble ? BALANCE.nobility.lanceDamage : 0);
+  const atkKey = KIND_ATTACK[u.kind];
+  const extra = (atkKey ? flat(state, atkKey) : 0) + (u.noble ? BALANCE.nobility.lanceDamage : 0);
   const base = (UNIT_DEFS[u.kind].attack + extra) * levelBonus(u, BALANCE.soldiers.attackPerLevel);
   return base * (1 + buffFraction(state, u));
 }
@@ -169,6 +175,12 @@ export function shieldInfo(state: GameState, u: Unit): { max: number; recharge: 
     return { max: L.battalionShield, recharge: L.battalionShieldRecharge };
   }
   return { max: 0, recharge: 0 };
+}
+
+// Alcance do ataque em tiles (0 = corpo a corpo).
+export function unitRange(state: GameState, u: Unit): number {
+  const r = UNIT_DEFS[u.kind].range ?? 0;
+  return r > 0 ? r + (u.kind === 'archer' ? flat(state, 'archerRange') : 0) : 0;
 }
 
 export function carryCapacity(state: GameState, u: Unit): number {

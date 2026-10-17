@@ -6,7 +6,7 @@ import { batchTime } from '../systems/production';
 import type { Sim } from '../core/sim';
 import type { SelectionController } from '../input/selection';
 import { populationCap } from '../state';
-import { canAfford, cancelTrain, trainUnit } from '../systems/commands';
+import { canAfford, cancelTrain, eraLocked, trainUnit } from '../systems/commands';
 import { dismissGuard, guardOf, releaseShelter } from '../systems/refuge';
 import { unitStatus } from '../systems/units';
 import { garrisonCount } from '../systems/damage';
@@ -71,7 +71,7 @@ export class BottomPanel {
     if (s.building !== null) {
       const b = this.sim.building(s.building);
       return b
-        ? `b:${b.id}:${b.built}:${b.queue.map((q) => q.count).join('.')}:${garrisonCount(this.sim, b) > 0}:${this.sim.state.alarm}:${b.research?.tech ?? ''}:${this.sim.state.techs.length}:${b.level}:${b.trainerId}:${b.guardId}:${b.doctorIds.length}:${b.upgradeProgress >= 0}:${b.kind === 'hospital' ? patients(this.sim, b).map((u) => u.id).join(',') : ''}:${b.kind === 'trainingGround' ? trainees(this.sim, b).map((u) => u.id).join(',') : ''}`
+        ? `b:${b.id}:${b.built}:${b.ruined}:${b.queue.map((q) => q.count).join('.')}:${garrisonCount(this.sim, b) > 0}:${this.sim.state.alarm}:${b.research?.tech ?? ''}:${this.sim.state.techs.length}:${b.level}:${b.trainerId}:${b.guardId}:${b.doctorIds.length}:${b.upgradeProgress >= 0}:${b.kind === 'hospital' ? patients(this.sim, b).map((u) => u.id).join(',') : ''}:${b.kind === 'trainingGround' ? trainees(this.sim, b).map((u) => u.id).join(',') : ''}`
         : '';
     }
     if (s.poi) {
@@ -114,7 +114,8 @@ export class BottomPanel {
   private buildTitan(id: number): void {
     const t = this.sim.titan(id);
     if (!t) return;
-    this.header(cmdIconImg('titan', 'portrait-img'), 'Titã', `${t.height.toFixed(1).replace('.', ',')} metros de altura`);
+    this.header(cmdIconImg('titan', 'portrait-img'), t.kind === 'abnormal' ? 'Titã Anormal' : 'Titã', `${t.height.toFixed(1).replace('.', ',')} metros de altura`);
+    if (t.kind === 'abnormal') this.info.append(el('div', 'bp-line warn', 'Imprevisível e muito rápido: muda de alvo de repente.'));
     const hp = el('div', 'bp-line');
     const status = el('div', 'bp-line');
     this.info.append(hp, status);
@@ -165,9 +166,14 @@ export class BottomPanel {
         const def = BUILDING_DEFS[kind];
         const letter = def.hotkey?.replace('Key', '') ?? '';
         const label = def.wall ? `${def.name} (por segmento)` : def.name;
-        const b = cmdButton(label, formatCost(def.cost), letter, `${def.name}: ${def.description}`, () => this.sel.startPlacing(kind), kind);
+        const locked = eraLocked(this.sim, kind);
+        const b = cmdButton(label, formatCost(def.cost), letter, `${def.name}: ${def.description}${locked ? ` — ${locked}` : ''}`, () => this.sel.startPlacing(kind), kind);
         this.commands.appendChild(b);
-        this.updaters.push(() => b.classList.toggle('disabled', !canAfford(this.sim, def.cost)));
+        if (locked) {
+          b.classList.add('locked', 'disabled');
+          b.dataset.era = ['I', 'II', 'III', 'IV'][BUILDING_DEFS[kind].era ?? 0];
+        }
+        else this.updaters.push(() => b.classList.toggle('disabled', !canAfford(this.sim, def.cost)));
       }
     }
     this.commands.appendChild(cmdButton('Parar', '', '', 'Interrompe a ordem atual', () => this.sel.stopSelected(), 'stop'));
@@ -178,6 +184,20 @@ export class BottomPanel {
     const b = this.sim.building(id);
     if (!b) return;
     const def = BUILDING_DEFS[b.kind];
+    if (b.ruined) {
+      // Escombro: passável até ser reconstruído (sem custo) pelos aldeões.
+      this.header(cmdIconImg(b.kind, 'portrait-img'), `Escombros: ${def.name}`, 'Passagem aberta para titãs e humanos');
+      const prog = progressBar();
+      const line = el('div', 'bp-line');
+      this.info.append(line, prog.el);
+      this.updaters.push(() => {
+        line.textContent = b.progress > 0 ? `Reconstruindo: ${Math.floor((b.progress / def.buildTime) * 100)}%` : 'Ninguém reconstruindo.';
+        prog.set(b.progress / def.buildTime);
+      });
+      this.info.append(el('div', 'bp-hint', 'Selecione aldeões e clique com o botão direito aqui para reconstruir, sem custo. Só some se você demolir.'));
+      this.commands.appendChild(dangerButton('Demolir', 'Del', () => this.sel.deleteSelected()));
+      return;
+    }
     const title = b.kind === 'house' && b.built ? BALANCE.city.houseLevelNames[b.level - 1] : def.name;
     this.header(cmdIconImg(b.kind, 'portrait-img'), title, b.built ? '' : 'Em construção');
     const hp = el('div', 'bp-line bp-stat');

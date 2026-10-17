@@ -26,13 +26,20 @@ export function isDaytime(tick: number): boolean {
   return h >= BALANCE.time.dawnHour && h < BALANCE.time.duskHour;
 }
 
-export function titanStats(height: number) {
+// Anormais (Era II em diante): mais vida, um pouco mais de dano e muito mais rápidos.
+export function titanStats(height: number, kind: Titan['kind'] = 'common') {
+  const ab = kind === 'abnormal';
   return {
-    maxHp: Math.round(T.hpPerMeter * height),
-    damage: T.damagePerMeter * height,
-    speed: T.speedBase + T.speedPerMeter * height,
+    maxHp: Math.round(T.hpPerMeter * height * (ab ? T.abnormal.hpMult : 1)),
+    damage: T.damagePerMeter * height * (ab ? T.abnormal.damageMult : 1),
+    speed: (T.speedBase + T.speedPerMeter * height) * (ab ? T.abnormal.speedMult : 1),
     radius: titanRadius(height),
   };
+}
+
+// Sorteia se um titã novo é anormal (só a partir da Era II).
+function rollKind(sim: Sim): Titan['kind'] {
+  return sim.state.era >= 1 && sim.rng.chance(T.abnormal.chance) ? 'abnormal' : 'common';
 }
 
 // --- Surgimento e agendamento da ameaça ---
@@ -74,16 +81,16 @@ export function spawnTitanNear(sim: Sim, height: number, distance: number): Tita
   return null;
 }
 
-export function spawnTitan(sim: Sim, height: number, angle?: number, at?: { tx: number; ty: number }): Titan | null {
+export function spawnTitan(sim: Sim, height: number, angle?: number, at?: { tx: number; ty: number }, kind: Titan['kind'] = 'common'): Titan | null {
   const ts = sim.tileSize;
   // Nunca numa ilha isolada (ficaria preso lá, e os soldados também, tentando alcançá-lo).
   let p: { tx: number; ty: number } | null = at && sim.isLandConnected(at.tx, at.ty) ? at : null;
   for (let attempt = 0; attempt < 12 && !p; attempt++) p = edgePoint(sim, angle ?? sim.rng.range(0, Math.PI * 2));
   if (!p) return null;
-  const st = titanStats(height);
+  const st = titanStats(height, kind);
   const t: Titan = {
     id: sim.nextId(),
-    kind: 'common',
+    kind,
     height,
     x: (p.tx + 0.5) * ts,
     y: (p.ty + 0.5) * ts,
@@ -121,7 +128,7 @@ export function updateThreat(sim: Sim): void {
   if (state.tick >= th.nextSpawnTick) {
     if (isDaytime(state.tick) && state.titans.length < T.maxAlive) {
       // Às vezes o titã sai de um ninho ativo, em vez da borda do mapa.
-      spawnTitan(sim, rollHeight(sim, clock.day), undefined, nestSpawnPoint(sim) ?? undefined);
+      spawnTitan(sim, rollHeight(sim, clock.day), undefined, nestSpawnPoint(sim) ?? undefined, rollKind(sim));
       const hours = Math.max(T.minIntervalHours, T.startIntervalHours - T.intervalDecayPerDay * (clock.day - T.firstSpawnDay));
       th.nextSpawnTick = state.tick + Math.round(hours * sim.rng.range(0.7, 1.3) * TICKS_PER_HOUR);
     } else {
@@ -148,7 +155,7 @@ export function updateThreat(sim: Sim): void {
     const week = Math.floor(clock.day / T.greatAttackEveryDays);
     const n = Math.min(T.greatAttackMaxByEra[eraIndex(sim)], T.greatAttackBase + T.greatAttackPerWeek * (week - 1));
     for (let i = 0; i < n; i++) {
-      const t = spawnTitan(sim, rollHeight(sim, clock.day + 3, 0.7), th.greatAttackDir + sim.rng.range(-0.35, 0.35));
+      const t = spawnTitan(sim, rollHeight(sim, clock.day + 3, 0.7), th.greatAttackDir + sim.rng.range(-0.35, 0.35), undefined, rollKind(sim));
       if (t) t.horde = true;
     }
     state.stats.hordeDeathsAtStart = state.stats.deaths;
@@ -183,8 +190,8 @@ function titanCost(sim: Sim, wade: boolean): CostFn {
     const id = sim.buildingIdAt(x, y);
     if (id) {
       const b = sim.building(id);
-      // Portão aberto: passagem livre.
-      if (b && !BUILDING_DEFS[b.kind].walkable && !isGateOpen(sim, b)) return T.wallCostBase + b.hp * T.wallCostPerHp;
+      // Portão aberto e escombros: passagem livre.
+      if (b && !BUILDING_DEFS[b.kind].walkable && !b.ruined && !isGateOpen(sim, b)) return T.wallCostBase + b.hp * T.wallCostPerHp;
     }
     if (sim.nodeAt(x, y)) return T.forestCost;
     return 1;
@@ -206,6 +213,19 @@ function distToBuilding(sim: Sim, x: number, y: number, b: Building): number {
 
 function chooseTarget(sim: Sim, t: Titan): void {
   const sight = T.sightRadius * sim.tileSize;
+  // Anormal: às vezes ignora os humanos e corre atrás de um edifício qualquer, até longe.
+  if (t.kind === 'abnormal' && sim.rng.chance(T.abnormal.buildingFixation)) {
+    const options = sim.state.buildings.filter((b) => {
+      const def = BUILDING_DEFS[b.kind];
+      return !def.wall && !def.gate && !def.walkable && distToBuilding(sim, t.x, t.y, b) < sight * 3;
+    });
+    if (options.length) {
+      const b = options[sim.rng.int(0, options.length - 1)];
+      t.targetKind = 'building';
+      t.targetId = b.id;
+      return;
+    }
+  }
   let best = sight * sight;
   t.targetKind = 'none';
   t.targetId = 0;
@@ -251,7 +271,7 @@ export function updateTitans(sim: Sim): void {
   const ts = sim.tileSize;
 
   for (const t of [...sim.state.titans]) {
-    const st = titanStats(t.height);
+    const st = titanStats(t.height, t.kind);
     // Intimidado por uma lenda: golpeia com menos força.
     const dmg = st.damage * titanDamageFactor(sim, t.id);
     t.hp = Math.min(t.maxHp, t.hp + T.regenPerSecond * DT);
@@ -264,7 +284,9 @@ export function updateTitans(sim: Sim): void {
 
     if (tick >= t.retargetTick || targetGone(sim, t)) {
       chooseTarget(sim, t);
-      t.retargetTick = tick + Math.round(T.retargetSeconds * TPS) + (t.id % 7);
+      // Anormais mudam de ideia a toda hora.
+      const secs = t.kind === 'abnormal' ? sim.rng.range(T.abnormal.retargetMin, T.abnormal.retargetMax) : T.retargetSeconds;
+      t.retargetTick = tick + Math.round(secs * TPS) + (t.id % 7);
     }
 
     alertIfSighted(sim, t);
@@ -364,7 +386,7 @@ function structureAt(sim: Sim, tx: number, ty: number): Building | undefined {
     gateBreach(sim, b);
     return undefined;
   }
-  return b && !BUILDING_DEFS[b.kind].walkable ? b : undefined;
+  return b && !BUILDING_DEFS[b.kind].walkable && !b.ruined ? b : undefined;
 }
 
 // Um titã passando por um portão aberto: aviso urgente.
@@ -375,7 +397,7 @@ function gateBreach(sim: Sim, b: Building): void {
 }
 
 function attackOrApproach(sim: Sim, t: Titan, b: Building, damage: number, speed: number): void {
-  const st = titanStats(t.height);
+  const st = titanStats(t.height, t.kind);
   if (distToBuilding(sim, t.x, t.y, b) <= st.radius * 0.5 + 14) {
     attackBuilding(sim, t, b, damage);
   } else {
@@ -411,7 +433,7 @@ function alertIfSighted(sim: Sim, t: Titan): void {
       t.sighted = true;
       const c = sim.state.world.width / 2;
       const dir = directionName(Math.atan2(t.y / ts - c, t.x / ts - c));
-      const text = `Titã de ${t.height.toFixed(1).replace('.', ',')} m avistado ao ${dir}!`;
+      const text = `${t.kind === 'abnormal' ? 'Titã ANORMAL' : 'Titã'} de ${t.height.toFixed(1).replace('.', ',')} m avistado ao ${dir}!`;
       addLog(sim.state, text);
       sim.alerts.push({ kind: 'sighted', text, x: t.x, y: t.y });
       return;

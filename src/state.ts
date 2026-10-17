@@ -22,7 +22,7 @@ import { BUILDING_DEFS, UNIT_DEFS } from './data/defs';
 import { randomName } from './entities/names';
 import { generatePois } from './world/pois';
 
-export const SAVE_VERSION = 9;
+export const SAVE_VERSION = 10;
 
 export interface LogEntry {
   tick: number;
@@ -160,6 +160,7 @@ export function newBuilding(id: number, kind: BuildingKind, tx: number, ty: numb
     guardId: 0,
     doctorIds: [],
     upgradeProgress: -1,
+    ruined: false,
   };
 }
 

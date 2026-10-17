@@ -50,14 +50,20 @@ export const NEIGHBOR_DIRS = [
   [0, -1], [1, 0], [0, 1], [-1, 0], [1, -1], [1, 1], [-1, 1], [-1, -1],
 ] as const;
 
-export function drawBuildingArt(kind: BuildingKind, built: boolean, progress01: number, mask = 0, level = 1, open = false): BuildingArt {
+export function drawBuildingArt(kind: BuildingKind, built: boolean, progress01: number, mask = 0, level = 1, open = false, ruined = false): BuildingArt {
   const ts = BALANCE.world.tileSize;
   const size = BUILDING_DEFS[kind].size * ts;
   const root = new Container();
   const def = BUILDING_DEFS[kind];
 
+  // Escombro de muro/portão de pedra: pedras espalhadas (passável); a reconstrução mostra a obra por cima.
+  if (ruined) {
+    const art = drawRubble(ts, progress01);
+    return art;
+  }
   if (def.wall || def.gate) {
-    const art = def.wall ? drawPalisade(mask, ts) : drawGate(mask, ts, open && built);
+    const stone = kind === 'stoneWall' || kind === 'stoneGate';
+    const art = kind === 'stoneWall' ? drawStoneWall(mask, ts) : def.wall ? drawPalisade(mask, ts) : drawGate(mask, ts, open && built, stone);
     if (!built) art.root.alpha = 0.3 + 0.5 * progress01;
     return art;
   }
@@ -98,6 +104,55 @@ function logRow(g: Graphics, x0: number, y0: number, x1: number, y1: number): vo
   }
 }
 
+// Muro de pedra visto de cima: faixas de blocos ligando o centro aos vizinhos (mais largo que a paliçada).
+function drawStoneWall(mask: number, ts: number): BuildingArt {
+  const root = new Container();
+  const g = new Graphics();
+  root.addChild(g);
+  const c = ts / 2;
+  const casters: Caster[] = [];
+  const arms: [number, number][] = [];
+  NEIGHBOR_DIRS.forEach(([dx, dy], i) => {
+    if (!(mask & (1 << i))) return;
+    if (i >= 4 && (mask & (1 << (dy < 0 ? 0 : 2)) || mask & (1 << (dx > 0 ? 1 : 3)))) return;
+    arms.push([dx, dy]);
+  });
+  if (!arms.length) arms.push([1, 0], [-1, 0]);
+  const half = 8;
+  for (const [dx, dy] of arms) {
+    const x1 = c + dx * c;
+    const y1 = c + dy * c;
+    const len = Math.hypot(x1 - c, y1 - c);
+    const ux = (x1 - c) / len;
+    const uy = (y1 - c) / len;
+    const nx = -uy * half;
+    const ny = ux * half;
+    g.poly([c + nx, c + ny, x1 + nx, y1 + ny, x1 - nx, y1 - ny, c - nx, c - ny]).fill(0x8f8a80);
+    // Juntas entre os blocos
+    for (let t = 6; t < len; t += 7) g.moveTo(c + ux * t + nx, c + uy * t + ny).lineTo(c + ux * t - nx, c + uy * t - ny).stroke({ width: 1, color: 0x5e5a52 });
+    g.moveTo(c + nx, c + ny).lineTo(x1 + nx, y1 + ny).stroke({ width: 1.5, color: 0xb3ada2 });
+    g.moveTo(c - nx, c - ny).lineTo(x1 - nx, y1 - ny).stroke({ width: 1.5, color: 0x5e5a52 });
+    casters.push(stripCaster(c, c, x1, y1, half, 7));
+  }
+  g.rect(c - half, c - half, half * 2, half * 2).fill(0x9a958a).stroke({ width: 1, color: 0x5e5a52 }); // pilar
+  return { root, casters };
+}
+
+// Escombros: blocos de pedra espalhados. Com obra em andamento, aparece a armação da reconstrução.
+function drawRubble(ts: number, progress01: number): BuildingArt {
+  const root = new Container();
+  const g = new Graphics();
+  root.addChild(g);
+  const blocks = [[6, 8, 9, 6], [17, 5, 8, 7], [10, 18, 11, 7], [21, 19, 7, 6], [4, 22, 6, 5]];
+  for (const [x, y, w, h] of blocks) g.rect(x, y, w, h).fill(0x7d786e).stroke({ width: 1, color: 0x4e4a44 });
+  for (const [x, y] of [[14, 14], [25, 12], [8, 15], [18, 26]]) g.circle(x, y, 1.8).fill(0x6a655c);
+  if (progress01 > 0) {
+    g.rect(3, 3, ts - 6, ts - 6).stroke({ width: 1.5, color: 0x6b4a2a, alpha: 0.9 });
+    g.rect(4, ts - 7, (ts - 8) * progress01, 3).fill(0xd9a441);
+  }
+  return { root };
+}
+
 // Paliçada vista de cima: fileiras de topos de troncos ligando o centro aos vizinhos.
 function drawPalisade(mask: number, ts: number): BuildingArt {
   const root = new Container();
@@ -122,12 +177,12 @@ function drawPalisade(mask: number, ts: number): BuildingArt {
 }
 
 // Portão: dois pilares e folhas de madeira, na direção da muralha.
-function drawGate(mask: number, ts: number, open = false): BuildingArt {
+function drawGate(mask: number, ts: number, open = false, stone = false): BuildingArt {
   const root = new Container();
   const g = new Graphics();
   root.addChild(g);
   const vertical = (mask & 0b0101) !== 0 && (mask & 0b1010) === 0;
-  const post = 0x8e8172;
+  const post = stone ? 0xa8a296 : 0x8e8172;
   const casters = [vertical ? rectCaster(ts / 2 - 8, -3, 16, ts + 6, 6) : rectCaster(-3, ts / 2 - 8, ts + 6, 16, 6)];
   if (open) {
     // Aberto: só os pilares, e as duas folhas giradas para o lado, deixando a passagem livre.
@@ -375,6 +430,56 @@ function drawFinished(kind: BuildingKind, size: number, level = 1): BuildingArt 
     case 'palisade':
     case 'gate':
       break;
+    case 'barracks': {
+      // Quartel: pátio de terra com galpão comprido, estandarte e armas encostadas.
+      casters.push(rectCaster(4, 4, size - 8, size * 0.5, 9));
+      g.rect(2, 2, size - 4, size - 4).fill(0x8a7650);
+      g.rect(2, 2, size - 4, size - 4).stroke({ width: 3, color: 0x6b5a43 });
+      const roof = 0x7a3a2a;
+      g.rect(4, 4, size - 8, size * 0.25).fill(shade(roof, 1.12));
+      g.rect(4, 4 + size * 0.25, size - 8, size * 0.25).fill(shade(roof, 0.8));
+      g.rect(4, 4 + size * 0.25 - 1, size - 8, 2).fill(shade(roof, 0.5));
+      for (let i = 0; i < 4; i++) {
+        const x = 14 + i * 14;
+        g.moveTo(x, size - 26).lineTo(x + 6, size - 8).stroke({ width: 2, color: 0x5a3d22 });
+        g.poly([x - 1, size - 28, x + 2, size - 33, x + 3, size - 27]).fill(0xc9ced3);
+      }
+      g.rect(size - 20, size - 40, 2, 30).fill(0x3a2e22);
+      g.poly([size - 18, size - 40, size - 4, size - 36, size - 18, size - 31]).fill(PLAYER_COLOR);
+      break;
+    }
+    case 'archeryRange': {
+      // Campo de arqueiros: galpão pequeno e alvos de palha em fila.
+      casters.push(rectCaster(4, 4, size * 0.45, size * 0.4, 7));
+      g.rect(2, 2, size - 4, size - 4).fill(0x9a8a5c);
+      g.rect(2, 2, size - 4, size - 4).stroke({ width: 2, color: 0x6b5a43 });
+      const roof = 0x5a6a3a;
+      g.rect(4, 4, size * 0.45, size * 0.2).fill(shade(roof, 1.1));
+      g.rect(4, 4 + size * 0.2, size * 0.45, size * 0.2).fill(shade(roof, 0.8));
+      for (let i = 0; i < 3; i++) {
+        const x = size * 0.62 + (i % 2) * 14;
+        const y = 16 + i * 22;
+        g.circle(x, y, 9).fill(0xe8d8a0).stroke({ width: 1, color: 0x8a7040 });
+        g.circle(x, y, 6).fill(0xc8283c);
+        g.circle(x, y, 3).fill(0xe8d8a0);
+        g.circle(x, y, 1.2).fill(0xc8283c);
+      }
+      break;
+    }
+    case 'stoneTower': {
+      casters.push(rectCaster(4, 4, size - 8, size - 8, 20));
+      g.rect(2, 2, size - 4, size - 4).fill(0x8f8a80);
+      g.rect(2, 2, size - 4, size - 4).stroke({ width: 2, color: 0x5e5a52 });
+      g.rect(8, 8, size - 16, size - 16).fill(0x77736a);
+      // Ameias
+      for (let i = 0; i < 4; i++) {
+        g.rect(2 + i * ((size - 10) / 3), 2, 6, 6).fill(0xb3ada2);
+        g.rect(2 + i * ((size - 10) / 3), size - 8, 6, 6).fill(0xb3ada2);
+      }
+      g.rect(size / 2 - 1, size / 2 - 22, 2, 22).fill(0x3a2e22);
+      g.poly([size / 2 + 1, size / 2 - 22, size / 2 + 15, size / 2 - 18, size / 2 + 1, size / 2 - 14]).fill(PLAYER_COLOR);
+      break;
+    }
     case 'farm': {
       g.rect(1, 1, size - 2, size - 2).fill(0x7b5a36);
       for (let y = 6; y < size - 4; y += 8) {

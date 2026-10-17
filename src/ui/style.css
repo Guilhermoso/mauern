@@ -387,3 +387,9 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
 .lore { padding: 10px 12px; margin-bottom: 8px; background: linear-gradient(180deg, rgba(232, 220, 176, 0.12), rgba(232, 220, 176, 0.05)); border-left: 3px solid var(--gold); }
 .lore-title { font-family: var(--serif); font-weight: 700; color: var(--gold-light); margin-bottom: 4px; }
 .lore-text { font-family: var(--serif); font-style: italic; line-height: 1.5; }
+
+/* Conteúdo de uma era futura: cadeado no canto */
+.cmd.locked::after {
+  content: attr(data-era); position: absolute; left: 2px; bottom: 2px; padding: 0 3px; font-size: 9px; font-weight: 700;
+  font-family: var(--serif); color: #fff; background: #8a2a20; border: 1px solid var(--gold); border-radius: 2px; line-height: 1.3;
+}

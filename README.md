@@ -52,6 +52,13 @@ aldeões designados como médicos curam um soldado cada por vez, e quem chega a 
 com ✚ abaixo de 30% de vida — por padrão só o comandante) correm sozinhos para um hospital com leitos para
 todos, entram juntos e saem juntos quando todos sararem.
 
+**Era II — Vila:** cumpridos os marcos da Era I (janela da era, na barra de cima), avance de era. A Era II libera
+o **Quartel** (lanceiros: infantaria pesada), o **Campo de Arqueiros** (arqueiros atacam de longe; dentro de torres
+somam o próprio ataque às flechas), o **muro e o portão de pedra** (arraste por cima da paliçada para trocá-la — a
+obra mantém a vida da paliçada até ficar mais forte) e a **torre de pedra**. Muro e portão de pedra destruídos viram
+**escombros** passáveis: mande aldeões reconstruir (sem custo) — só somem se você demolir. Na Era II também surgem os
+**titãs anormais**: mais rápidos, mais resistentes e imprevisíveis.
+
 **Mundo externo:** o mapa começa coberto pela **névoa de guerra** — só se vê o que unidades e edifícios
 enxergam (batedores veem longe). Lá fora há **pontos de interesse**: ruínas para vasculhar (recursos), sobreviventes
 para resgatar (viram aldeões), ninhos de titãs para destruir (de onde vêm titãs), jazidas de ferro valiosas e locais

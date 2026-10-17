@@ -3,7 +3,31 @@ import { BUILDING_DEFS, formatCost } from '../data/defs';
 import { TECH_IDS, TECH_DEFS } from '../data/techs';
 import type { Sim } from '../core/sim';
 import { getClock } from '../core/time';
-import { canAfford } from './commands';
+import { canAfford, pay } from './commands';
+import { addLog } from '../state';
+import { addMoraleMod } from './damage';
+
+// O que cada era libera (texto para o aviso de nova era).
+export const ERA_UNLOCKS = [
+  '',
+  'Quartel (lanceiros), Campo de Arqueiros (arqueiros), muro, portão e torre de pedra. Titãs maiores — e os primeiros anormais.',
+];
+
+// Avança para a próxima era, se todos os marcos foram cumpridos. Retorna erro ou null.
+export function advanceEra(sim: Sim): string | null {
+  const s = sim.state;
+  if (s.era >= 1) return 'A próxima era ainda não está disponível.';
+  const ms = eraMilestones(sim);
+  if (!ms.every((m) => m.done)) return 'Ainda faltam marcos para avançar.';
+  pay(sim, BALANCE.era.toVila.cost);
+  s.era++;
+  const text = `A vila chega à ${ERA_NAMES[s.era]}! ${ERA_UNLOCKS[s.era]}`;
+  addLog(s, text);
+  const c = s.world.width / 2;
+  sim.alerts.push({ kind: 'victory', text: `Nova era: ${ERA_NAMES[s.era]}!`, x: c * sim.tileSize, y: c * sim.tileSize });
+  addMoraleMod(sim, 'Nova era', BALANCE.era.newEraMorale, 72);
+  return null;
+}
 
 export const ERA_NAMES = ['Era I — Refúgio', 'Era II — Vila', 'Era III — Fortaleza', 'Era IV — Grandes Muralhas'];
 
@@ -42,7 +66,7 @@ function computeEnclosed(sim: Sim): boolean {
   const blocked = (x: number, y: number) => {
     if (!sim.nav.isTerrainWalkable(x, y)) return true;
     const b = sim.buildingAt(x, y);
-    return !!b && !BUILDING_DEFS[b.kind].walkable;
+    return !!b && !BUILDING_DEFS[b.kind].walkable && !b.ruined;
   };
   for (let y = tc.ty - 1; y <= tc.ty + size; y++) {
     for (let x = tc.tx - 1; x <= tc.tx + size; x++) {
@@ -74,8 +98,10 @@ function computeEnclosed(sim: Sim): boolean {
   return true;
 }
 
+// Marcos da era atual para chegar à próxima (só existem para a Era I por enquanto).
 export function eraMilestones(sim: Sim): Milestone[] {
   const s = sim.state;
+  if (s.era >= 1) return [];
   const r = BALANCE.era.toVila;
   const day = getClock(s.tick).day;
   const pop = s.units.length;

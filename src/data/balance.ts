@@ -43,9 +43,9 @@ export const BALANCE = {
   fog: {
     startRadius: 18, // área já conhecida no começo da partida
     updateTicks: 10, // a visão é recalculada a cada 10 passos (0,5 s)
-    sight: { villager: 6, scout: 12, militia: 7 } as Record<string, number>,
+    sight: { villager: 6, scout: 12, militia: 7, spearman: 7, archer: 9 } as Record<string, number>,
     buildingSight: 6,
-    buildingSightByKind: { townCenter: 11, watchTower: 13 } as Record<string, number>,
+    buildingSightByKind: { townCenter: 11, watchTower: 13, stoneTower: 15 } as Record<string, number>,
   },
   // Pontos de interesse fora dos muros.
   pois: {
@@ -148,6 +148,16 @@ export const BALANCE = {
     wallCostPerHp: 1 / 40, // estruturas mais fortes custam mais: os titãs procuram o ponto fraco
     forestCost: 3,
     gateOpenSeconds: 3, // o portão fica aberto por este tempo depois que alguém passa (titãs podem entrar)
+    // Anormais (Era II em diante): imprevisíveis.
+    abnormal: {
+      chance: 0.15, // dos titãs que surgem
+      hpMult: 1.25,
+      damageMult: 1.15,
+      speedMult: 1.6,
+      retargetMin: 2, // segundos entre trocas de alvo
+      retargetMax: 5,
+      buildingFixation: 0.45, // chance de ignorar humanos e correr atrás de um edifício
+    },
     wadeMinHeight: 4, // titãs a partir desta altura (m) atravessam água rasa
     shallowCost: 3, // custo de caminho na água rasa (evitam, mas cruzam se compensar)
     shallowSpeedFactor: 0.5, // velocidade dentro da água rasa
@@ -159,6 +169,7 @@ export const BALANCE = {
     sightAlertRadius: 30, // tiles de qualquer edifício: avisa que um titã foi avistado
   },
   combat: {
+    archerGarrisonFactor: 1, // arqueiro abrigado numa torre soma este tanto do próprio ataque a cada flecha
     meleeReach: 20, // alcance extra (px) do golpe humano além dos raios
     titanReach: 10,
     autoAttackRadius: 6, // tiles: milicianos atacam titãs que chegam a essa distância
@@ -202,6 +213,7 @@ export const BALANCE = {
     maxDaysBetween: 4,
   },
   era: {
+    newEraMorale: 15, // moral ao chegar a uma nova era (por 3 dias)
     // Marcos para avançar da Era I para a Era II.
     toVila: {
       days: 20,

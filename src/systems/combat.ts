@@ -6,7 +6,7 @@ import type { Building, Titan, Unit, UnitOrder } from '../entities/types';
 import { clearPath, moveTo, stepToward } from './movement';
 import { ejectGarrison, garrisonCount, killTitan, titanRadius } from './damage';
 import { buildingCenter } from './queries';
-import { flat, unitAttack } from './modifiers';
+import { flat, unitAttack, unitRange } from './modifiers';
 import { gainXp } from './soldiers';
 import { damageToTitanFactor } from './nobility';
 import { honors } from './modifiers';
@@ -68,11 +68,11 @@ export function nearestTitan(sim: Sim, x: number, y: number, radiusPx: number, a
 
 // Dá para chegar a pé, a partir de (x, y), a algum ponto de onde se golpeia este titã?
 // (Titã numa ilha, no meio de um lago ou além de uma muralha fechada: não.)
-export function titanReachable(sim: Sim, x: number, y: number, t: Titan, unitRadius = 7): boolean {
+export function titanReachable(sim: Sim, x: number, y: number, t: Titan, unitRadius = 7, rangeTiles = 0): boolean {
   const ts = sim.tileSize;
   const region = sim.nav.regionAt(Math.floor(x / ts), Math.floor(y / ts));
   if (!region) return true; // parado num tile sem região (raro): não descarta
-  const reach = unitRadius + titanRadius(t.height) + BALANCE.combat.meleeReach;
+  const reach = rangeTiles > 0 ? rangeTiles * ts + titanRadius(t.height) : unitRadius + titanRadius(t.height) + BALANCE.combat.meleeReach;
   const r = Math.max(1, Math.floor(reach / ts));
   const tx = Math.floor(t.x / ts);
   const ty = Math.floor(t.y / ts);
@@ -99,7 +99,9 @@ export function updateAttack(sim: Sim, u: Unit, o: AttackOrder): boolean {
   if (!t) return false;
   const ts = sim.tileSize;
   const def = UNIT_DEFS[u.kind];
-  const reach = def.radius + titanRadius(t.height) + BALANCE.combat.meleeReach;
+  // Arqueiros atiram de longe; os outros golpeiam corpo a corpo.
+  const range = unitRange(sim.state, u);
+  const reach = range > 0 ? range * ts + titanRadius(t.height) : def.radius + titanRadius(t.height) + BALANCE.combat.meleeReach;
   const d = Math.hypot(t.x - u.x, t.y - u.y);
   if (d <= reach) {
     u.moving = false;
@@ -107,12 +109,13 @@ export function updateAttack(sim: Sim, u: Unit, o: AttackOrder): boolean {
     if (u.attackCooldown <= 0) {
       u.attackCooldown = def.attackCooldown;
       u.lastCombatTick = sim.state.tick;
-      sim.fx.push({ type: 'hit', x: t.x, y: t.y });
+      if (range > 0) sim.fx.push({ type: 'arrow', x: u.x, y: u.y - 4, x2: t.x, y2: t.y });
+      else sim.fx.push({ type: 'hit', x: t.x, y: t.y });
       hitTitan(sim, t, unitAttack(sim.state, u), u);
     }
     return true;
   }
-  if (d < 2.5 * ts) {
+  if (range === 0 && d < 2.5 * ts) {
     // Perto: vai direto, se o tile seguinte estiver livre.
     const nx = u.x + ((t.x - u.x) / d) * 6;
     const ny = u.y + ((t.y - u.y) / d) * 6;
@@ -168,7 +171,9 @@ function nearestTileInRegion(sim: Sim, cx: number, cy: number, region: number, r
 // Unidades militares paradas atacam titãs que chegam perto.
 export function autoAcquire(sim: Sim, u: Unit): void {
   if (!UNIT_DEFS[u.kind].autoAttack || (sim.state.tick + u.id) % 10 !== 0) return;
-  const t = nearestReachableTitan(sim, u.x, u.y, BALANCE.combat.autoAttackRadius * sim.tileSize);
+  const range = unitRange(sim.state, u);
+  const radius = Math.max(BALANCE.combat.autoAttackRadius, range + 2) * sim.tileSize;
+  const t = nearestTitan(sim, u.x, u.y, radius, (x) => titanReachable(sim, u.x, u.y, x, UNIT_DEFS[u.kind].radius, range));
   if (t) {
     u.order = { type: 'attack', titanId: t.id };
     clearPath(u);
@@ -214,7 +219,12 @@ export function updateBuildingAttacks(sim: Sim): void {
     if (!t) continue;
     b.attackCooldown = atk.cooldown;
     sim.fx.push({ type: 'arrow', x: c.x, y: c.y - 10, x2: t.x, y2: t.y });
-    hitTitan(sim, t, atk.damage + flat(sim.state, 'arrowDamage') + atk.damagePerGarrison * n);
+    // Arqueiros abrigados somam o próprio ataque às flechas da torre (e ganham experiência com isso).
+    const archers = n ? sim.state.units.filter((u) => u.garrison === b.id && u.kind === 'archer') : [];
+    const archerDamage = archers.reduce((sum, u) => sum + unitAttack(sim.state, u), 0) * BALANCE.combat.archerGarrisonFactor;
+    const damage = atk.damage + flat(sim.state, 'arrowDamage') + atk.damagePerGarrison * n + archerDamage;
+    for (const u of archers) gainXp(sim, u, (damage / archers.length) * BALANCE.soldiers.xpPerDamage);
+    hitTitan(sim, t, damage);
   }
 }
 

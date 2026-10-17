@@ -29,7 +29,13 @@ export type BuildingKind =
   | 'bonfire'
   | 'trainingGround'
   | 'refuge'
-  | 'hospital';
+  | 'hospital'
+  // Era II
+  | 'barracks'
+  | 'archeryRange'
+  | 'stoneWall'
+  | 'stoneGate'
+  | 'stoneTower';
 
 export interface TrainItem {
   kind: UnitKind;
@@ -63,9 +69,10 @@ export interface Building {
   guardId: number; // campo de refúgio: soldado no posto (0 = nenhum)
   doctorIds: number[]; // hospital: aldeões designados como médicos
   upgradeProgress: number; // segundos de ampliação já feitos (-1 = não está ampliando)
+  ruined: boolean; // muros de pedra destruídos viram escombros (passáveis) até serem reconstruídos
 }
 
-export type UnitKind = 'villager' | 'scout' | 'militia';
+export type UnitKind = 'villager' | 'scout' | 'militia' | 'spearman' | 'archer';
 
 export interface Carry {
   kind: ResourceKind;
@@ -144,7 +151,7 @@ export interface Battalion {
   formation: Formation;
 }
 
-export type TitanKind = 'common';
+export type TitanKind = 'common' | 'abnormal';
 
 export interface Titan {
   id: number;
