@@ -28,11 +28,18 @@ export function hitTitan(sim: Sim, t: Titan, damage: number, attacker?: Unit): v
   if (t.hp <= 0) {
     killTitan(sim, t);
     if (attacker) {
-      const before = honors(attacker);
-      attacker.kills++;
-      const now = honors(attacker);
-      if (now > before) {
-        const text = `${attacker.name} recebeu a ${now}ª honra (${attacker.kills} titãs abatidos).`;
+      // O abate conta para quem golpeou e, num batalhão, para todos os integrantes.
+      const credited = attacker.battalion ? sim.state.units.filter((u) => u.battalion === attacker.battalion) : [attacker];
+      const honored: string[] = [];
+      for (const u of credited) {
+        const before = honors(u);
+        u.kills++;
+        const now = honors(u);
+        if (now > before) honored.push(credited.length > 1 ? `${u.name} (${now}ª)` : `${u.name} recebeu a ${now}ª honra (${u.kills} titãs abatidos)`);
+      }
+      if (honored.length) {
+        const b = attacker.battalion ? sim.state.battalions.find((x) => x.id === attacker.battalion) : undefined;
+        const text = b && credited.length > 1 ? `Honra para o ${b.name}: ${honored.join(', ')}.` : `${honored[0]}.`;
         addLog(sim.state, text);
         sim.alerts.push({ kind: 'promotion', text, x: attacker.x, y: attacker.y });
       }

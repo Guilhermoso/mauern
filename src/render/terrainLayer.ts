@@ -183,6 +183,11 @@ export class TerrainLayer {
         if (h > 0.7) g.circle(px + h2 * 26 + 3, py + h * 26 + 3, 1.2).fill(shade(TILE_INFO[Tile.Sand].color, 0.85));
         break;
       case Tile.Water:
+        // Rasa: dá para ver pedrinhas e areia no fundo.
+        if (h > 0.45) g.circle(px + h2 * 24 + 4, py + h * 22 + 5, 1.8).fill({ color: 0xd8c79a, alpha: 0.35 });
+        if (h2 > 0.6) g.circle(px + h * 20 + 6, py + h2 * 18 + 8, 1.3).fill({ color: 0x8a8f7a, alpha: 0.4 });
+        if (h > 0.75) g.rect(px + h2 * 18 + 3, py + h * 24 + 3, 9, 1.5).fill({ color: 0xffffff, alpha: 0.22 });
+        break;
       case Tile.DeepWater:
         if (h > 0.75) {
           g.rect(px + h2 * 18 + 3, py + h * 24 + 3, 9, 1.5).fill({ color: 0xffffff, alpha: 0.18 });

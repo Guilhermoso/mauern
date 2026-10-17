@@ -350,3 +350,25 @@ describe('caçada em formação', () => {
     expect(ms.every((m) => m.order.type === 'attack')).toBe(true);
   });
 });
+
+describe('honra do batalhão', () => {
+  it('o abate de um membro conta para todos os integrantes do batalhão', () => {
+    const s = flatGame();
+    setNoon(s);
+    const c = soldier(s, CENTER + 5, CENTER + 5, 30);
+    const m1 = soldier(s, CENTER + 6, CENTER + 5, 1);
+    const m2 = soldier(s, CENTER + 7, CENTER + 5, 1);
+    const loner = soldier(s, CENTER + 20, CENTER + 5, 1);
+    const sim = new Sim(s);
+    formBattalion(sim, [c.id, m1.id, m2.id]);
+    for (const u of [c, m1, m2]) u.kills = 9;
+    const t = addTitan(s, CENTER + 30, CENTER + 30);
+    hitTitan(sim, t, 1e6, m2);
+    for (const u of [c, m1, m2]) {
+      expect(u.kills).toBe(10);
+      expect(honors(u)).toBe(1);
+    }
+    expect(loner.kills).toBe(0);
+    expect(s.log.some((l) => l.text.startsWith('Honra para o'))).toBe(true);
+  });
+});

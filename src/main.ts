@@ -322,7 +322,7 @@ async function boot(): Promise<void> {
       sim.alerts = [];
     }
     overlay.update(sim, selection, camera.zoom);
-    lighting.update(getClock(state.tick).dayFraction, camera.screenW, camera.screenH);
+    lighting.update(getClock(state.tick).dayFraction, camera, state, performance.now() / 1000);
 
     if (selection.consumeChanged()) bottom.update();
     hudTimer += dtMs;

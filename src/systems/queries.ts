@@ -31,15 +31,20 @@ export function findNearestNode(
   const max = BALANCE.units.maxGatherersPerNode;
   let best: ResourceNode | undefined;
   let bestD = Infinity;
-  for (let y = ty - radius; y <= ty + radius; y++) {
-    for (let x = tx - radius; x <= tx + radius; x++) {
-      const n = sim.nodeAt(x, y);
-      if (!n || n.kind !== kind || avoid.includes(n.id)) continue;
-      if (gatherers && (gatherers.get(n.id) ?? 0) >= max) continue;
-      const d = (x - tx) ** 2 + (y - ty) ** 2;
-      if (d < bestD && isExposed(sim, n)) {
-        bestD = d;
-        best = n;
+  // Anéis crescentes em volta do ponto: para assim que nenhum anel mais distante pode ter algo mais perto.
+  for (let r = 0; r <= radius; r++) {
+    if (r * r > bestD) break;
+    for (let y = ty - r; y <= ty + r; y++) {
+      const edgeRow = y === ty - r || y === ty + r;
+      for (let x = tx - r; x <= tx + r; x += edgeRow ? 1 : 2 * r || 1) {
+        const n = sim.nodeAt(x, y);
+        if (!n || n.kind !== kind || avoid.includes(n.id)) continue;
+        if (gatherers && (gatherers.get(n.id) ?? 0) >= max) continue;
+        const d = (x - tx) ** 2 + (y - ty) ** 2;
+        if (d < bestD && isExposed(sim, n)) {
+          bestD = d;
+          best = n;
+        }
       }
     }
   }

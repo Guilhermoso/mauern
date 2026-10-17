@@ -1,7 +1,7 @@
 import { BALANCE } from '../data/balance';
 import { BUILDING_DEFS, UNIT_DEFS, VILLAGER_BUILDS } from '../data/defs';
 import type { Sim } from '../core/sim';
-import type { BuildingKind } from '../entities/types';
+import type { BuildingKind, Unit } from '../entities/types';
 import type { Camera } from '../render/camera';
 import {
   canAfford,
@@ -308,13 +308,31 @@ export class SelectionController {
     this.clear();
   }
 
-  private boxSelect(rect: { x: number; y: number; w: number; h: number }, additive: boolean): void {
+// Unidades dentro da caixa de seleção (em coordenadas de tela). Com alguma unidade militar na
+  // caixa, só as militares contam (aldeões ficam de fora).
+  boxUnits(rect: { x: number; y: number; w: number; h: number }): Unit[] {
     const a = this.camera.screenToWorld(rect.x, rect.y);
     const b = this.camera.screenToWorld(rect.x + rect.w, rect.y + rect.h);
-    let insideUnits = this.sim.state.units.filter((u) => !u.garrison && u.x >= a.x && u.x <= b.x && u.y >= a.y && u.y <= b.y);
-    // Com alguma unidade militar na caixa, só as militares são selecionadas (aldeões ficam de fora).
-    if (insideUnits.some((u) => UNIT_DEFS[u.kind].military)) insideUnits = insideUnits.filter((u) => UNIT_DEFS[u.kind].military);
-    const inside = insideUnits.map((u) => u.id);
+    let inside = this.sim.state.units.filter((u) => !u.garrison && u.x >= a.x && u.x <= b.x && u.y >= a.y && u.y <= b.y);
+    if (inside.some((u) => UNIT_DEFS[u.kind].military)) inside = inside.filter((u) => UNIT_DEFS[u.kind].military);
+    return inside;
+  }
+
+  // O que a caixa vai selecionar ao soltar o botão (batalhões entram inteiros), para o destaque.
+  boxPreview(): Unit[] {
+    const rect = this.placing ? null : this.dragRect();
+    if (!rect) return [];
+    const inside = this.boxUnits(rect);
+    const out = new Set(inside);
+    for (const u of inside) {
+      if (!u.battalion) continue;
+      for (const m of this.sim.state.units) if (m.battalion === u.battalion && !m.garrison) out.add(m);
+    }
+    return [...out];
+  }
+
+  private boxSelect(rect: { x: number; y: number; w: number; h: number }, additive: boolean): void {
+    const inside = this.boxUnits(rect).map((u) => u.id);
     if (additive) {
       this.setSelection({ units: [...new Set([...this.selection.units, ...inside])], battalions: this.selection.battalions });
     } else if (inside.length) {

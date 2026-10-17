@@ -32,7 +32,7 @@ export const BALANCE = {
   },
   units: {
     nodeSearchRadius: 12, // raio (tiles) para achar outro recurso igual quando um acaba
-    dropsiteSearchRadius: 20, // raio (tiles) em volta do depósito para escolher o próximo recurso
+    dropsiteSearchRadius: 60, // raio (tiles) em volta do depósito para escolher o próximo recurso
     maxGatherersPerNode: 3, // aldeões coletando o mesmo recurso ao mesmo tempo
     autoTaskRadius: 10, // raio para tarefas automáticas após construir
     maxTrainQueue: 10, // lotes na fila de um edifício
@@ -115,6 +115,9 @@ export const BALANCE = {
     wallCostBase: 6, // custo de atravessar uma estrutura no pathfinding (incentiva contornar)
     wallCostPerHp: 1 / 40, // estruturas mais fortes custam mais: os titãs procuram o ponto fraco
     forestCost: 3,
+    wadeMinHeight: 4, // titãs a partir desta altura (m) atravessam água rasa
+    shallowCost: 3, // custo de caminho na água rasa (evitam, mas cruzam se compensar)
+    shallowSpeedFactor: 0.5, // velocidade dentro da água rasa
     greatAttackEveryDays: 7,
     greatAttackBase: 3,
     greatAttackPerWeek: 1,

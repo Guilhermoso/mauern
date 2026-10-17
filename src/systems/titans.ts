@@ -5,6 +5,7 @@ import { getClock, ticksPerDay } from '../core/time';
 import { addLog } from '../state';
 import type { Building, Titan } from '../entities/types';
 import { findPath, goalKey, type CostFn, type Goal } from '../world/pathfinding';
+import { Tile } from '../world/terrain';
 import { stepToward } from './movement';
 import { damageBuilding, damageUnit, titanRadius } from './damage';
 import { titanDamageFactor } from './nobility';
@@ -155,11 +156,26 @@ export function updateThreat(sim: Sim): void {
 
 // --- Comportamento dos titãs ---
 
-// Custo de caminho para titãs: atravessam florestas (devagar) e derrubam estruturas.
+// Titãs grandes (4 m ou mais) atravessam a água rasa.
+export function canWade(height: number): boolean {
+  return height >= T.wadeMinHeight;
+}
+
+function isShallow(sim: Sim, x: number, y: number): boolean {
+  const w = sim.state.world;
+  return x >= 0 && y >= 0 && x < w.width && y < w.height && w.tiles[y * w.width + x] === Tile.Water;
+}
+
+// Terreno por onde o titã anda (o dos humanos, mais a água rasa para os grandes).
+function titanWalkable(sim: Sim, x: number, y: number, wade: boolean): boolean {
+  return sim.nav.isTerrainWalkable(x, y) || (wade && isShallow(sim, x, y));
+}
+
+// Custo de caminho para titãs: atravessam florestas e água rasa (devagar) e derrubam estruturas.
 // Estruturas mais fortes custam mais, então eles procuram o ponto mais fraco da muralha.
-function titanCost(sim: Sim): CostFn {
+function titanCost(sim: Sim, wade: boolean): CostFn {
   return (x, y) => {
-    if (!sim.nav.isTerrainWalkable(x, y)) return Infinity;
+    if (!sim.nav.isTerrainWalkable(x, y)) return wade && isShallow(sim, x, y) ? T.shallowCost : Infinity;
     const id = sim.buildingIdAt(x, y);
     if (id) {
       const b = sim.building(id);
@@ -226,7 +242,7 @@ function chooseTarget(sim: Sim, t: Titan): void {
 export function updateTitans(sim: Sim): void {
   const tick = sim.state.tick;
   const day = isDaytime(tick);
-  const cost = titanCost(sim);
+  const costs = { wade: titanCost(sim, true), dry: titanCost(sim, false) };
   const ts = sim.tileSize;
 
   for (const t of [...sim.state.titans]) {
@@ -235,7 +251,11 @@ export function updateTitans(sim: Sim): void {
     const dmg = st.damage * titanDamageFactor(sim, t.id);
     t.hp = Math.min(t.maxHp, t.hp + T.regenPerSecond * DT);
     if (t.attackCooldown > 0) t.attackCooldown -= DT;
-    const speed = st.speed * (day ? 1 : T.nightSpeedFactor);
+    const wade = canWade(t.height);
+    const cost = wade ? costs.wade : costs.dry;
+    // Dentro da água rasa, anda mais devagar até sair.
+    const inWater = isShallow(sim, Math.floor(t.x / sim.tileSize), Math.floor(t.y / sim.tileSize));
+    const speed = st.speed * (day ? 1 : T.nightSpeedFactor) * (inWater ? T.shallowSpeedFactor : 1);
 
     if (tick >= t.retargetTick || targetGone(sim, t)) {
       chooseTarget(sim, t);
@@ -284,7 +304,7 @@ export function updateTitans(sim: Sim): void {
       const ny = t.y + Math.sin(t.facing) * speed * DT * 2;
       const ntx = Math.floor(nx / ts);
       const nty = Math.floor(ny / ts);
-      if (sim.nav.isTerrainWalkable(ntx, nty)) {
+      if (titanWalkable(sim, ntx, nty, wade)) {
         const blocker = structureAt(sim, ntx, nty);
         if (blocker) attackOrApproach(sim, t, blocker, dmg * T.buildingDamageFactor, speed);
         else stepToward(t, targetX, targetY, speed);
@@ -294,15 +314,21 @@ export function updateTitans(sim: Sim): void {
 
     // 3. Segue o caminho; se uma estrutura estiver no caminho, derruba.
     const key = goalKey(goal);
-    if ((key !== t.pathKey && tick >= t.repathTick) || t.path.length === 0) {
+    // Recalcula no máximo a cada repathSeconds — mesmo sem caminho (alvo inalcançável), senão a busca
+    // inteira se repetiria a cada passo e o jogo engasgaria.
+    if ((key !== t.pathKey || t.path.length === 0) && tick >= t.repathTick) {
       const r = findPath(sim.nav, Math.floor(t.x / ts), Math.floor(t.y / ts), goal, 25000, cost);
       t.path = r.tiles;
       t.pathKey = key;
       t.repathTick = tick + Math.round(T.repathSeconds * TPS);
-      if (t.path.length === 0) {
-        stepToward(t, targetX, targetY, speed);
-        continue;
-      }
+    }
+    if (t.path.length === 0) {
+      // Sem caminho: anda direto, mas só por onde consegue (não atravessa água funda nem rocha).
+      const d = Math.hypot(targetX - t.x, targetY - t.y) || 1;
+      const nx = t.x + ((targetX - t.x) / d) * Math.max(speed * DT, ts * 0.5);
+      const ny = t.y + ((targetY - t.y) / d) * Math.max(speed * DT, ts * 0.5);
+      if (titanWalkable(sim, Math.floor(nx / ts), Math.floor(ny / ts), wade)) stepToward(t, targetX, targetY, speed);
+      continue;
     }
     const w = sim.nav.width;
     const next = t.path[0];

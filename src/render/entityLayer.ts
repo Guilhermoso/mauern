@@ -4,6 +4,7 @@ import { BUILDING_DEFS } from '../data/defs';
 import type { Sim } from '../core/sim';
 import type { Building, ResourceKind, Unit } from '../entities/types';
 import { PLAYER_COLOR } from './colors';
+import { daylight, getClock } from '../core/time';
 import { drawBuildingArt, NEIGHBOR_DIRS, type BuildingArt } from './buildingArt';
 import { createTitanView, updateTitanView, type TitanView } from './titanArt';
 
@@ -54,6 +55,7 @@ export class EntityLayer {
     const state = sim.state;
     const ts = BALANCE.world.tileSize;
     const aliveB = new Set<number>();
+    const sun = sunShadow(state.tick);
     for (const b of state.buildings) {
       aliveB.add(b.id);
       const def = BUILDING_DEFS[b.kind];
@@ -70,6 +72,11 @@ export class EntityLayer {
       }
       // Edifícios que se pode atravessar (fazenda, campo de treinamento) ficam sempre por baixo das unidades.
       v.art.root.zIndex = def.walkable ? -1e6 + b.ty : (b.ty + def.size) * ts;
+      if (v.art.shadow) {
+        const h = (v.art.shadowHeight ?? 8) / 8;
+        v.art.shadow.position.set(sun.dx * h, sun.dy * h);
+        v.art.shadow.alpha = sun.alpha;
+      }
       if (v.art.blades) v.art.blades.rotation = timeSec * 0.6 + b.id;
       if (v.art.flame) {
         // Chama que tremula.
@@ -128,6 +135,25 @@ export class EntityLayer {
       }
     }
   }
+}
+
+// Deslocamento da sombra (em px, para um edifício de altura 8) conforme a posição do sol:
+// de manhã o sol nasce a leste e a sombra se estende para oeste; ao meio-dia ela é curta;
+// à tarde vai para leste. À noite quase some.
+function sunShadow(tick: number): { dx: number; dy: number; alpha: number } {
+  const c = getClock(tick);
+  const hour = c.dayFraction * 24;
+  const { dawnHour, duskHour } = BALANCE.time;
+  const t = Math.min(1, Math.max(0, (hour - dawnHour) / (duskHour - dawnHour))); // 0 = nascer, 1 = pôr do sol
+  const angle = t * Math.PI; // 0 = leste, π = oeste
+  const elevation = Math.sin(angle); // 0 no horizonte, 1 ao meio-dia
+  const len = 6 + 24 * Math.abs(Math.cos(angle)); // sombra longa com o sol baixo, curta ao meio-dia
+  const light = daylight(c.dayFraction);
+  return {
+    dx: -Math.cos(angle) * len,
+    dy: 4 + 3 * (1 - elevation), // o sol passa um pouco ao sul: a sombra pende para o norte… e para baixo na tela
+    alpha: 0.25 + 0.75 * light * (0.55 + 0.45 * elevation),
+  };
 }
 
 function wallMask(sim: Sim, b: Building): number {

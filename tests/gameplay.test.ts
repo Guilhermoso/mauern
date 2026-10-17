@@ -278,3 +278,21 @@ describe('escolha do próximo recurso', () => {
     }
   });
 });
+
+describe('escolha do próximo recurso — depósito longe', () => {
+  it('com o depósito a mais de 20 tiles, ainda escolhe a árvore mais perto dele', () => {
+    const s = flatGame();
+    const camp = newBuilding(s.nextId++, 'lumberCamp', CENTER + 30, CENTER, true);
+    s.buildings.push(camp);
+    const a = addNode(s, 'tree', CENTER + 30, CENTER - 25, 1); // floresta "de cima", 25 tiles do depósito
+    const nearOld = addNode(s, 'tree', CENTER + 28, CENTER - 26, 100);
+    const nearCamp = addNode(s, 'tree', CENTER + 31, CENTER + 23, 100); // "de baixo", 22 tiles
+    const u = addVillager(s, CENTER + 30, CENTER - 24);
+    const sim = new Sim(s);
+    commandGather(sim, [u.id], a.id);
+    runSeconds(sim, 6);
+    expect(sim.node(a.id)).toBeUndefined();
+    expect(u.order.type === 'gather' && u.order.nodeId).toBe(nearCamp.id);
+    expect(nearOld.amount).toBe(100);
+  });
+});

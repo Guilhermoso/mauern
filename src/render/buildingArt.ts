@@ -9,6 +9,8 @@ import { PLAYER_COLOR, shade } from './colors';
 
 export interface BuildingArt {
   root: Container;
+  shadow?: Graphics; // sombra no chão, movida conforme a posição do sol
+  shadowHeight?: number; // "altura" do edifício: quanto a sombra se estende
   blades?: Graphics;
   flame?: Graphics;
 }
@@ -110,14 +112,19 @@ function drawGate(mask: number, ts: number): BuildingArt {
   return { root };
 }
 
-function shadow(g: Graphics, size: number, off = 8): void {
-  g.rect(off, off + 2, size, size).fill({ color: 0x000000, alpha: 0.28 });
-}
-
 function drawFinished(kind: BuildingKind, size: number, level = 1): BuildingArt {
   const root = new Container();
+  const sh = new Graphics();
   const g = new Graphics();
-  root.addChild(g);
+  root.addChild(sh, g);
+  // A sombra fica numa camada própria, com a forma do edifício; quem a desloca é a camada de
+  // entidades, conforme a hora do dia. "off" vira a altura relativa do edifício.
+  let shadowHeight = 0;
+  const shadow = (_g: Graphics, s: number, off = 8): void => {
+    const inset = (size - s) / 2;
+    sh.rect(inset, inset, s, s).fill({ color: 0x000000, alpha: 0.28 });
+    shadowHeight = off;
+  };
   switch (kind) {
     case 'townCenter': {
       shadow(g, size, 10);
@@ -259,7 +266,7 @@ function drawFinished(kind: BuildingKind, size: number, level = 1): BuildingArt 
       flame.circle(0, -1.5, 2).fill({ color: 0xfff1b0 });
       flame.position.set(c, c);
       root.addChild(flame);
-      return { root, flame };
+      return { root, flame, shadow: sh, shadowHeight };
     }
     case 'lumberCamp': {
       shadow(g, size - 8, 8);
@@ -308,7 +315,7 @@ function drawFinished(kind: BuildingKind, size: number, level = 1): BuildingArt 
       }
       blades.position.set(size / 2, size / 2);
       root.addChild(blades);
-      return { root, blades };
+      return { root, blades, shadow: sh, shadowHeight };
     }
     case 'watchTower': {
       shadow(g, size - 10, 12);
@@ -339,5 +346,5 @@ function drawFinished(kind: BuildingKind, size: number, level = 1): BuildingArt 
       break;
     }
   }
-  return { root };
+  return { root, shadow: sh, shadowHeight };
 }

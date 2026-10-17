@@ -32,6 +32,13 @@ export class OverlayLayer {
     const s = sel.selection;
     const pt0 = () => sel.placementTile();
 
+    // Seleção em caixa em andamento: destaca quem será selecionado ao soltar o botão.
+    for (const u of sel.boxPreview()) {
+      const r = UNIT_DEFS[u.kind].radius;
+      under.ellipse(u.x, u.y + 3, r + 5, (r + 5) * 0.6).fill({ color: 0x9dff8a, alpha: 0.28 });
+      under.ellipse(u.x, u.y + 3, r + 5, (r + 5) * 0.6).stroke({ width: line, color: 0xc8ffb8, alpha: 0.9 });
+    }
+
     // Brilho dourado em volta de todo comandante de batalhão (bônus de liderança).
     const pulse = 0.25 + 0.15 * Math.sin(performance.now() / 300);
     for (const bat of sim.state.battalions) {
