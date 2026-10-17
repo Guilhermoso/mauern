@@ -21,7 +21,8 @@ import { isSoldier, setTrainer, trainees, trainer, trainingRate, dismissTraining
 import { battalionCapacity, battalionOf, battalionUnits, canChooseFormation, disbandBattalion, setAutoHospital, setCommander, setFormation, setMode, toggleCritical } from '../systems/battalions';
 import { canEnnoble, ennoble } from '../systems/nobility';
 import { dismissDoctors, doctors, hospitalBeds, patients, startHospitalUpgrade, upgradeCost, upgradeTime } from '../systems/hospital';
-import { auraBonus, buffFraction, honorBonus, honors, isLegend, leadershipBonus, shieldInfo, unitAttack } from '../systems/modifiers';
+import { activeBuffs } from '../systems/buffs';
+import { buffFraction, honorBonus, honors, isLegend, leadershipBonus, shieldInfo, unitAttack } from '../systems/modifiers';
 import type { Building, Formation, Unit, UnitKind } from '../entities/types';
 
 // Painel inferior: informações do que está selecionado e botões de comando.
@@ -77,6 +78,7 @@ export class BottomPanel {
   }
 
   private rebuild(): void {
+    hideTip();
     this.info.innerHTML = '';
     this.commands.innerHTML = '';
     this.updaters = [];
@@ -285,8 +287,24 @@ export class BottomPanel {
     const bar = progressBar();
     const stats = el('div', 'bp-line');
     const glory = el('div', 'bp-line bp-lead');
-    this.info.append(rank, bar.el, stats, glory);
+    const buffs = el('div', 'bp-buffs');
+    this.info.append(rank, bar.el, stats, glory, buffs);
+    let buffKey = '';
     this.updaters.push(() => {
+      // Ícones dos bônus ativos; só redesenha quando algo muda.
+      const list = activeBuffs(this.sim, u);
+      const key = list.map((b) => `${b.id}|${b.name}|${b.effect}|${b.source}`).join('#');
+      if (key !== buffKey) {
+        buffKey = key;
+        buffs.innerHTML = '';
+        for (const b of list) {
+          const ic = el('span', `buff-icon ${b.kind}`, b.icon);
+          ic.onmouseenter = () => showTip(ic, b.name, b.effect, b.source);
+          ic.onmouseleave = hideTip;
+          buffs.appendChild(ic);
+        }
+        hideTip();
+      }
       const f = isFemaleName(u.name);
       const titles = [u.noble ? (f ? 'Nobre dama' : 'Nobre cavaleiro') : '', isLegend(u) ? 'Lenda' : ''].filter(Boolean).join(' · ');
       rank.textContent = `${titles ? `${titles} — ` : ''}${rankName(u.level)} · nível ${u.level}`;
@@ -298,14 +316,7 @@ export class BottomPanel {
       const sh = shieldInfo(st, u);
       if (sh.max > 0) parts.push(`Escudo: ${Math.ceil(u.shield)}/${sh.max}`);
       glory.textContent = parts.join(' · ');
-      const a = auraBonus(st, u);
-      glory.title = [
-        `Comando: +${pct(leadershipBonus(st, u))}`,
-        `Aura de nobre: +${pct(a.noble)}`,
-        `Aura de lenda: +${pct(a.legend)}`,
-        `Honras: +${pct(honorBonus(u))}`,
-        'Os bônus se somam sobre a vida e o ataque base.',
-      ].join('\n');
+      glory.title = 'Os bônus se somam sobre a vida e o ataque base. Passe o mouse nos ícones abaixo para ver cada um.';
       const need = xpToNext(u.level);
       bar.set(u.level >= MAX_LEVEL ? 1 : u.xp / need);
       bar.el.title = u.level >= MAX_LEVEL ? 'Nível máximo' : `Experiência: ${Math.floor(u.xp)}/${need}`;
@@ -631,6 +642,27 @@ export class BottomPanel {
     if (!def.gatherable) this.info.append(el('div', 'bp-hint', 'Um mistério. Talvez um dia saibamos para que servem.'));
     else this.info.append(el('div', 'bp-hint', 'Selecione aldeões e clique com o botão direito para coletar.'));
   }
+}
+
+// Dica flutuante dos ícones de bônus (fica no <body> para não ser cortada pelo painel).
+let tipEl: HTMLElement | null = null;
+
+function showTip(anchor: HTMLElement, title: string, effect: string, source: string): void {
+  if (!tipEl) {
+    tipEl = el('div', 'buff-tip');
+    document.body.appendChild(tipEl);
+  }
+  tipEl.innerHTML = '';
+  tipEl.append(el('div', 'buff-tip-title', title), el('div', 'buff-tip-effect', effect), el('div', 'buff-tip-source', `Fonte: ${source}`));
+  tipEl.style.display = 'block';
+  const r = anchor.getBoundingClientRect();
+  const w = tipEl.offsetWidth;
+  tipEl.style.left = `${Math.max(8, Math.min(window.innerWidth - w - 8, r.left + r.width / 2 - w / 2))}px`;
+  tipEl.style.top = `${r.top - tipEl.offsetHeight - 8}px`;
+}
+
+function hideTip(): void {
+  if (tipEl) tipEl.style.display = 'none';
 }
 
 function pct(frac: number): string {

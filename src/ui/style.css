@@ -159,6 +159,7 @@ button.danger:hover { background: #73302a; }
 .bp-sub { color: var(--muted); }
 .bp-line.warn { color: #ff8a6a; }
 .bp-hint { color: var(--muted); font-size: 12px; font-style: italic; margin-top: 4px; }
+.bp-info > * { flex-shrink: 0; } /* sem isto, o painel cheio espreme a barra de experiência até sumir */
 .bp-bar { height: 6px; background: rgba(0, 0, 0, 0.5); border-radius: 3px; overflow: hidden; margin: 2px 0; }
 .bp-bar-fill { height: 100%; width: 0; background: var(--accent); }
 .bp-queue { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 4px; }
@@ -284,3 +285,21 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
 .bp-hp { color: var(--muted); font-variant-numeric: tabular-nums; }
 .bp-hp.critical { color: #ff6b5c; font-weight: 700; }
 .bp-lead { color: #e8c96a; }
+
+/* Ícones de bônus do militar selecionado */
+.bp-buffs { display: flex; flex-wrap: wrap; gap: 4px; margin: 2px 0; }
+.bp-buffs:empty { display: none; }
+.buff-icon {
+  width: 22px; height: 22px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center;
+  font-size: 13px; line-height: 1; cursor: help; border: 1px solid rgba(255, 255, 255, 0.25); background: #3a3f48; color: #e6e6e6;
+}
+.buff-icon.gold { background: #5a4518; border-color: #e8c96a; color: #ffe08a; }
+.buff-icon.blue { background: #1d3550; border-color: #7fb8ff; color: #cfe6ff; }
+.buff-icon.green { background: #1f3f26; border-color: #7fd88a; color: #d4f5d8; }
+.buff-icon:hover { filter: brightness(1.3); }
+.buff-tip {
+  position: fixed; z-index: 1000; display: none; max-width: 280px; padding: 8px 10px; pointer-events: none;
+  background: rgba(20, 22, 26, 0.96); border: 1px solid #e8c96a; border-radius: 6px; font-size: 12px; line-height: 1.35;
+}
+.buff-tip-title { font-weight: 700; color: #e8c96a; margin-bottom: 2px; }
+.buff-tip-source { color: var(--muted); margin-top: 3px; font-style: italic; }

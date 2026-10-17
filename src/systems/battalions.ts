@@ -8,7 +8,7 @@ import { titanAt } from './commands';
 import { gainXp, isSoldier } from './soldiers';
 import { nearestTitan } from './combat';
 import { freeBeds, nearestHospitalWithBeds } from './hospital';
-import { buffFraction, unitMaxHp } from './modifiers';
+import { buffFraction, unitBaseHp, unitMaxHp } from './modifiers';
 import { BUILDING_DEFS } from '../data/defs';
 
 const S = BALANCE.soldiers;
@@ -274,7 +274,10 @@ function syncLeadershipHp(sim: Sim): void {
     seen.add(u.id);
     const bonus = buffFraction(sim.state, u);
     const prev = map.get(u.id);
-    if (prev !== undefined && prev !== bonus) u.hp = Math.min(unitMaxHp(sim.state, u), u.hp * ((1 + bonus) / (1 + prev)));
+    if (prev !== undefined && prev !== bonus) u.hp *= (1 + bonus) / (1 + prev);
+    // Nunca acima do máximo (arredondamentos e ganhos de vida base, como o título de nobreza).
+    const max = Math.round(unitBaseHp(sim.state, u) * (1 + bonus));
+    if (u.hp > max) u.hp = max;
     map.set(u.id, bonus);
   }
   for (const id of map.keys()) if (!seen.has(id)) map.delete(id);

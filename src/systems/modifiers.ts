@@ -124,13 +124,17 @@ export function leadershipBonus(state: GameState, u: Unit): number {
 
 // Auras de nobres e lendas próximos (de outros: cada tipo de aura vale uma vez só).
 export function auraBonus(state: GameState, u: Unit): { noble: number; legend: number } {
-  if (!UNIT_DEFS[u.kind].military) return { noble: 0, legend: 0 };
+  const src = auraSources(state, u);
+  return { noble: src.noble ? BALANCE.nobility.auraBonus : 0, legend: src.legend ? BALANCE.legend.auraBonus : 0 };
+}
+
+// Quem emite cada aura que alcança a unidade (o primeiro encontrado).
+export function auraSources(state: GameState, u: Unit): { noble?: Unit; legend?: Unit } {
+  if (!UNIT_DEFS[u.kind].military) return {};
   const { nobles, legends } = notableUnits(state);
-  const N = BALANCE.nobility;
-  const L = BALANCE.legend;
   return {
-    noble: nobles.some((n) => n !== u && together(u, n, N.auraRadius)) ? N.auraBonus : 0,
-    legend: legends.some((l) => l !== u && together(u, l, L.radius)) ? L.auraBonus : 0,
+    noble: nobles.find((n) => n !== u && together(u, n, BALANCE.nobility.auraRadius)),
+    legend: legends.find((l) => l !== u && together(u, l, BALANCE.legend.radius)),
   };
 }
 
