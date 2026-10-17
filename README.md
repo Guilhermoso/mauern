@@ -34,8 +34,8 @@ No modo caçar, todo o batalhão ganha 1 de experiência por segundo a cada 20 n
 nível 40, o comandante libera as **formações**: bloco, linha, coluna, cunha e círculo.
 
 **Honras, nobreza e lendas:** a cada 10 titãs abatidos o soldado ganha uma **honra** (+2% de vida e ataque cada,
-até 10; com 10 honras, +30%). Militares de nível 70+ podem receber um **título de nobreza** (500 de ouro + 25
-por dia): montam a cavalo com lança dourada (+5 de dano e +50 de vida base), dão +5% de vida e ataque aos
+até 10; com 10 honras, +30%). Militares de nível 70+ podem receber um **título de nobreza** (500 de ouro pelo
+1º nobre, 1000 pelo 2º, 1500 pelo 3º... + 40 de ouro por dia cada): montam a cavalo com lança dourada (+5 de dano e +50 de vida base), dão +5% de vida e ataque aos
 militares por perto, aceleram o próprio batalhão em 5%, somam +10% ao bônus de comando (e o recebem também),
 têm prioridade no hospital e, como treinadores, dão +5 de experiência por segundo. Se um nobre morrer, a moral
 despenca. No nível 100 o soldado vira **lenda**: +10% de vida e ataque para os militares por perto, intimida os

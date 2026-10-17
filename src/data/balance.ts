@@ -42,8 +42,8 @@ export const BALANCE = {
   // Nobreza: título concedido a soldados de nível alto.
   nobility: {
     minLevel: 70,
-    cost: { gold: 500 },
-    upkeepGold: 25, // ouro por dia, por nobre
+    costStep: 500, // ouro: o 1º nobre custa 500, o 2º 1000, o 3º 1500... (conta os nobres vivos)
+    upkeepGold: 40, // ouro por dia, por nobre
     unpaidMorale: -8, // moral quando não há ouro para pagar os nobres (por 1 dia)
     leadershipBonus: 0.1, // +10% fixo no bônus de comando (e o nobre comandante recebe o bônus total)
     battalionSpeed: 0.05, // +5% de velocidade para o batalhão do nobre

@@ -3,6 +3,7 @@ import { UNIT_DEFS } from '../data/defs';
 import type { Sim } from '../core/sim';
 import { addLog } from '../state';
 import type { Unit } from '../entities/types';
+import type { Cost } from '../data/defs';
 import { isFemaleName } from '../entities/names';
 import { canAfford, pay } from './commands';
 import { addMoraleMod } from './damage';
@@ -15,6 +16,11 @@ const TPS = BALANCE.time.ticksPerSecond;
 // Nobreza, lendas e seus efeitos que não são bônus de vida/ataque (esses ficam em modifiers.ts):
 // intimidação dos titãs, escudos e o soldo diário dos nobres.
 
+// Custo do próximo título: cresce com o número de nobres vivos.
+export function nobleCost(sim: Sim): Cost {
+  return { gold: N.costStep * (notableUnits(sim.state).nobles.length + 1) };
+}
+
 export function canEnnoble(u: Unit): boolean {
   return UNIT_DEFS[u.kind].military && !u.noble && u.level >= N.minLevel;
 }
@@ -25,8 +31,9 @@ export function ennoble(sim: Sim, unitId: number): string | null {
   if (!u || !UNIT_DEFS[u.kind].military) return 'Só militares recebem títulos.';
   if (u.noble) return 'Já é nobre.';
   if (u.level < N.minLevel) return `Exige nível ${N.minLevel}.`;
-  if (!canAfford(sim, N.cost)) return 'Ouro insuficiente.';
-  pay(sim, N.cost);
+  const cost = nobleCost(sim);
+  if (!canAfford(sim, cost)) return `Ouro insuficiente (o próximo título custa ${cost.gold}).`;
+  pay(sim, cost);
   // A vida base extra entra já curada (os bônus percentuais são ajustados em proporção depois).
   u.hp += N.extraHp * levelBonusOf(u) * (1 + buffFraction(sim.state, u));
   u.noble = true;

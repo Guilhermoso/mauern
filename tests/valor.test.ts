@@ -4,7 +4,7 @@ import { BALANCE } from '../src/data/balance';
 import { newBuilding, newUnit, type GameState } from '../src/state';
 import { formBattalion, formationSlot, setFormation, setMode } from '../src/systems/battalions';
 import { buffFraction, honorBonus, honors, unitAttack, unitBaseHp, unitMaxHp } from '../src/systems/modifiers';
-import { ennoble, payNobles } from '../src/systems/nobility';
+import { ennoble, nobleCost, payNobles } from '../src/systems/nobility';
 import { hitTitan } from '../src/systems/combat';
 import { damageUnit, killUnit } from '../src/systems/damage';
 import { trainingRate } from '../src/systems/soldiers';
@@ -40,6 +40,23 @@ describe('nobreza', () => {
     expect(high.noble).toBe(true);
     expect(s.resources.gold).toBe(100);
     expect(ennoble(sim, high.id)).not.toBeNull();
+  });
+
+  it('cada novo título custa mais: 500, 1000, 1500 (conta só os nobres vivos)', () => {
+    const s = flatGame();
+    const [a, b, c] = [0, 10, 20].map((dx) => soldier(s, CENTER + 5 + dx, CENTER + 25, 80));
+    s.resources.gold = 1499;
+    const sim = new Sim(s);
+    expect(nobleCost(sim).gold).toBe(500);
+    expect(ennoble(sim, a.id)).toBeNull();
+    expect(nobleCost(sim).gold).toBe(1000);
+    expect(ennoble(sim, b.id)).not.toBeNull(); // 999 de ouro: não dá
+    s.resources.gold = 1000;
+    expect(ennoble(sim, b.id)).toBeNull();
+    expect(nobleCost(sim).gold).toBe(1500);
+    killUnit(sim, a, ['morto', 'morta']);
+    expect(nobleCost(sim).gold).toBe(1000);
+    void c;
   });
 
   it('nobre ganha +50 de vida base e +5 de dano base (lança dourada)', () => {
@@ -92,11 +109,11 @@ describe('nobreza', () => {
   it('soldo diário e moral: falta de ouro e morte do nobre derrubam a moral', () => {
     const s = flatGame();
     const u = soldier(s, CENTER + 5, CENTER + 5, 70);
-    s.resources.gold = 500 + 30;
+    s.resources.gold = 500 + 50;
     const sim = new Sim(s);
     ennoble(sim, u.id);
     payNobles(sim);
-    expect(s.resources.gold).toBe(5);
+    expect(s.resources.gold).toBe(10);
     payNobles(sim);
     expect(s.resources.gold).toBe(0);
     expect(moraleTarget(sim).parts.some((p) => p.label === 'Nobres sem soldo')).toBe(true);

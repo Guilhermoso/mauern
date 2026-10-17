@@ -19,7 +19,7 @@ import { housingOf } from '../state';
 import { rankName, xpToNext, MAX_LEVEL } from '../data/ranks';
 import { isSoldier, setTrainer, trainees, trainer, trainingRate, dismissTraining } from '../systems/soldiers';
 import { battalionCapacity, battalionOf, battalionUnits, canChooseFormation, disbandBattalion, setAutoHospital, setCommander, setFormation, setMode, toggleCritical } from '../systems/battalions';
-import { canEnnoble, ennoble } from '../systems/nobility';
+import { canEnnoble, ennoble, nobleCost } from '../systems/nobility';
 import { dismissDoctors, doctors, hospitalBeds, patients, startHospitalUpgrade, upgradeCost, upgradeTime } from '../systems/hospital';
 import { activeBuffs } from '../systems/buffs';
 import { buffFraction, honorBonus, honors, isLegend, leadershipBonus, shieldInfo, unitAttack } from '../systems/modifiers';
@@ -324,12 +324,12 @@ export class BottomPanel {
     });
   }
 
-  // Conceder título de nobreza (nível 70+): 500 de ouro e soldo diário.
+  // Conceder título de nobreza (nível 70+): ouro (mais caro a cada nobre) e soldo diário.
   private ennobleButton(u: Unit): HTMLButtonElement {
     const N = BALANCE.nobility;
     const btn = cmdButton(
       `Nobreza: ${u.name.split(' ')[0]}`,
-      `${formatCost(N.cost)} + ${N.upkeepGold} ouro/dia`,
+      `${formatCost(nobleCost(this.sim))} + ${N.upkeepGold} ouro/dia`,
       '',
       `Título de nobreza para ${u.name}: monta a cavalo com lança dourada (+${N.lanceDamage} de dano base, +${N.extraHp} de vida base). ` +
         `Como comandante, +${N.leadershipBonus * 100}% no bônus de comando (e o recebe também); o batalhão anda ${N.battalionSpeed * 100}% mais rápido. ` +
@@ -340,7 +340,12 @@ export class BottomPanel {
         if (err) this.toast(err);
       },
     );
-    this.updaters.push(() => btn.classList.toggle('disabled', !canAfford(this.sim, N.cost)));
+    const costEl = btn.querySelector('.cmd-cost')!;
+    this.updaters.push(() => {
+      const cost = nobleCost(this.sim);
+      costEl.textContent = `${formatCost(cost)} + ${N.upkeepGold} ouro/dia`;
+      btn.classList.toggle('disabled', !canAfford(this.sim, cost));
+    });
     return btn;
   }
 
