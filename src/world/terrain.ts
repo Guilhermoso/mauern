@@ -1,0 +1,26 @@
+export const enum Tile {
+  Grass = 0,
+  Dirt = 1,
+  Forest = 2,
+  Water = 3,
+  Rock = 4,
+  Sand = 5,
+  DeepWater = 6,
+}
+
+export interface TileInfo {
+  name: string;
+  color: number;
+  walkable: boolean;
+  buildable: boolean;
+}
+
+export const TILE_INFO: Record<number, TileInfo> = {
+  [Tile.Grass]: { name: 'Grama', color: 0x5f8f3e, walkable: true, buildable: true },
+  [Tile.Dirt]: { name: 'Terra', color: 0x8a7148, walkable: true, buildable: true },
+  [Tile.Forest]: { name: 'Floresta', color: 0x3f6b2c, walkable: true, buildable: false },
+  [Tile.Water]: { name: 'Água', color: 0x3b6e9e, walkable: false, buildable: false },
+  [Tile.Rock]: { name: 'Rocha', color: 0x77736b, walkable: false, buildable: false },
+  [Tile.Sand]: { name: 'Areia', color: 0xc9b47c, walkable: true, buildable: true },
+  [Tile.DeepWater]: { name: 'Água funda', color: 0x2c5682, walkable: false, buildable: false },
+};
