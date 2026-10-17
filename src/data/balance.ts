@@ -123,6 +123,25 @@ export const BALANCE = {
       cost: { food: 800, wood: 600, stone: 300 },
     },
   },
+  soldiers: {
+    hpPerLevel: 0.015, // +1,5% de vida por nível
+    attackPerLevel: 0.03, // +3% de ataque por nível
+    xpPerDamage: 1, // experiência por ponto de dano causado a um titã
+    xpPerKillPerMeter: 20, // abate: 20 de experiência por metro do titã
+    battalionShareOfKill: 0.5, // o resto do batalhão divide metade do bônus de abate
+    // Campo de treinamento
+    trainingCapacity: 8, // alunos por campo (além do treinador)
+    trainingXpPerSecond: 1.2,
+    trainerBonusPerLevel: 0.05, // cada nível do treinador acelera o treino em 5%
+    aboveTrainerFactor: 0.25, // aluno no nível do treinador (ou acima) aprende a 25% da velocidade
+    trainerShare: 0.35, // o treinador ganha 35% da experiência que ensina
+    // Batalhões
+    battalionBase: 2, // soldados (além do comandante) com comandante nível 1
+    battalionPerLevels: 4, // +1 vaga a cada 4 níveis do comandante
+    defendRadius: 18, // tiles em volta do ponto de defesa
+    huntRadius: 90, // tiles: até onde o batalhão procura titãs
+    formationSpacing: 20, // px entre soldados na formação
+  },
   camera: {
     minZoom: 0.35,
     maxZoom: 2,

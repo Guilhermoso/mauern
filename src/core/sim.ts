@@ -16,7 +16,7 @@ export type Fx =
 
 // Avisos ao jogador (notificação + som). A interface os consome.
 export interface Alert {
-  kind: 'sighted' | 'underAttack' | 'greatAttack' | 'death' | 'destroyed' | 'victory' | 'chronicle' | 'research' | 'event';
+  kind: 'sighted' | 'underAttack' | 'greatAttack' | 'death' | 'destroyed' | 'victory' | 'chronicle' | 'research' | 'event' | 'promotion';
   text: string;
   x: number;
   y: number;

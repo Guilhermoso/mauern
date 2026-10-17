@@ -13,6 +13,10 @@ import { BALANCE } from '../data/balance';
 import { missingNeeds, serviceRadius } from '../systems/city';
 import { buildingMaxHp, unitMaxHp } from '../systems/modifiers';
 import { housingOf } from '../state';
+import { rankName, xpToNext, MAX_LEVEL } from '../data/ranks';
+import { isSoldier, setTrainer, trainees, trainer, trainingRate, dismissTraining } from '../systems/soldiers';
+import { battalionCapacity, battalionOf, battalionUnits, disbandBattalion, setCommander, setMode } from '../systems/battalions';
+import { unitAttack } from '../systems/modifiers';
 import type { Building, Unit, UnitKind } from '../entities/types';
 
 // Painel inferior: informações do que está selecionado e botões de comando.
@@ -44,6 +48,11 @@ export class BottomPanel {
 
   private structureKey(): string {
     const s = this.sel.selection;
+    if (s.battalions.length === 1 && !s.units.length) {
+      const b = battalionOf(this.sim, s.battalions[0]);
+      return b ? `bat:${b.id}:${b.commanderId}:${b.memberIds.join(',')}:${b.mode}` : '';
+    }
+    if (s.battalions.length) return `bats:${s.battalions.join(',')}:${s.units.join(',')}`;
     if (s.units.length) {
       const one = s.units.length === 1 ? this.sim.unit(s.units[0])?.kind : '';
       return `u:${s.units.join(',')}:${one}`;
@@ -51,7 +60,7 @@ export class BottomPanel {
     if (s.building !== null) {
       const b = this.sim.building(s.building);
       return b
-        ? `b:${b.id}:${b.built}:${b.queue.length}:${garrisonCount(this.sim, b) > 0}:${this.sim.state.alarm}:${b.research?.tech ?? ''}:${this.sim.state.techs.length}:${b.level}`
+        ? `b:${b.id}:${b.built}:${b.queue.length}:${garrisonCount(this.sim, b) > 0}:${this.sim.state.alarm}:${b.research?.tech ?? ''}:${this.sim.state.techs.length}:${b.level}:${b.trainerId}:${b.kind === 'trainingGround' ? trainees(this.sim, b).map((u) => u.id).join(',') : ''}`
         : '';
     }
     if (s.node !== null) return `n:${s.node}`;
@@ -65,7 +74,9 @@ export class BottomPanel {
     this.updaters = [];
     const s = this.sel.selection;
     this.el.classList.toggle('hidden', this.key === '');
-    if (s.units.length) this.buildUnits(s.units);
+    if (s.battalions.length === 1 && !s.units.length) this.buildBattalion(s.battalions[0]);
+    else if (s.battalions.length) this.buildMixed(s.battalions, s.units);
+    else if (s.units.length) this.buildUnits(s.units);
     else if (s.building !== null) this.buildBuilding(s.building);
     else if (s.node !== null) this.buildNode(s.node);
     else if (s.titan !== null) this.buildTitan(s.titan);
@@ -95,7 +106,9 @@ export class BottomPanel {
       const sub = el('div', 'bp-sub', unitNoun(u.kind, isFemaleName(u.name)));
       const hp = el('div', 'bp-line');
       const status = el('div', 'bp-line');
-      this.info.append(title, sub, hp, status);
+      this.info.append(title, sub);
+      if (isSoldier(u)) this.soldierLines(u);
+      this.info.append(hp, status);
       this.updaters.push(() => {
         hp.textContent = `Vida: ${Math.ceil(u.hp)}/${unitMaxHp(this.sim.state, u)}`;
         status.textContent = unitStatus(this.sim, u);
@@ -107,7 +120,14 @@ export class BottomPanel {
       for (const [kind, n] of counts) this.info.append(el('div', 'bp-line', `${n}× ${UNIT_DEFS[kind].name}`));
     }
 
-    this.info.append(el('div', 'bp-hint', 'Clique direito: andar, coletar, construir, reparar, abrigar ou atacar.'));
+    this.info.append(el('div', 'bp-hint', 'Clique direito: andar, coletar, construir, reparar, abrigar, treinar ou atacar.'));
+    if (units.some((u) => isSoldier(u))) {
+      this.commands.appendChild(
+        cmdButton('Formar batalhão', 'o de maior nível comanda', 'B', 'Junta os soldados selecionados num batalhão: andam e lutam juntos.', () =>
+          this.sel.formBattalionFromSelection(),
+        ),
+      );
+    }
     if (units.some((u) => u.kind === 'villager')) {
       for (const kind of VILLAGER_BUILDS) {
         const def = BUILDING_DEFS[kind];
@@ -151,6 +171,7 @@ export class BottomPanel {
     this.info.append(dmg);
     this.updaters.push(() => (dmg.textContent = b.hp < buildingMaxHp(this.sim.state, b) ? 'Danificado: aldeões podem reparar (botão direito).' : ''));
     if (b.kind === 'house') this.buildHouseInfo(b);
+    if (b.kind === 'trainingGround') this.buildTrainingGround(b);
     if (b.kind === 'well' || b.kind === 'bonfire') {
       this.info.append(el('div', 'bp-line', `Alcance: ${serviceRadius(this.sim, b.kind)} tiles (círculo no mapa)`));
     }
@@ -225,6 +246,111 @@ export class BottomPanel {
       this.info.append(el('div', 'bp-hint', 'Botão direito no mapa define o ponto de reunião.'));
     }
     if (b.kind !== 'townCenter') this.commands.appendChild(dangerButton('Demolir', 'Del', () => this.sel.deleteSelected()));
+  }
+
+  // Patente, nível, barra de experiência e força do soldado.
+  private soldierLines(u: Unit): void {
+    const rank = el('div', 'bp-rank');
+    const bar = progressBar();
+    const stats = el('div', 'bp-line');
+    this.info.append(rank, bar.el, stats);
+    this.updaters.push(() => {
+      rank.textContent = `${rankName(u.level)} · nível ${u.level}`;
+      const need = xpToNext(u.level);
+      bar.set(u.level >= MAX_LEVEL ? 1 : u.xp / need);
+      bar.el.title = u.level >= MAX_LEVEL ? 'Nível máximo' : `Experiência: ${Math.floor(u.xp)}/${need}`;
+      stats.textContent = `Ataque ${unitAttack(this.sim.state, u).toFixed(1).replace('.', ',')}`;
+    });
+  }
+
+  private buildBattalion(id: number): void {
+    const b = battalionOf(this.sim, id);
+    if (!b) return;
+    const c = this.sim.unit(b.commanderId);
+    this.info.append(el('div', 'bp-title', b.name));
+    if (c) {
+      this.info.append(el('div', 'bp-sub', `Comandante: ${c.name}`));
+      this.soldierLines(c);
+    }
+    const size = el('div', 'bp-line');
+    const status = el('div', 'bp-line');
+    this.info.append(size, status);
+    this.updaters.push(() => {
+      const cmd = this.sim.unit(b.commanderId);
+      size.textContent = `Soldados: ${b.memberIds.length}/${cmd ? battalionCapacity(cmd.level) : 0} (+ comandante)`;
+      const o = b.order;
+      const modeText = { manual: 'Sob seu comando', defend: 'Defendendo a posição', hunt: 'Caçando titãs' }[b.mode];
+      status.textContent = `${modeText} — ${o.type === 'attack' ? 'em combate' : o.type === 'move' ? 'em marcha' : 'parado'}`;
+    });
+    this.info.append(el('div', 'bp-hint', 'Clique direito: mover ou atacar (volta ao modo manual). Subir o comandante de nível abre mais vagas.'));
+
+    const modes: [typeof b.mode, string, string, string][] = [
+      ['manual', 'Manual', 'você comanda', 'O batalhão só age quando você manda (mas revida titãs por perto).'],
+      ['defend', 'Defender aqui', 'protege este ponto', 'Guarda a posição atual e ataca titãs que se aproximarem.'],
+      ['hunt', 'Caçar titãs', 'patrulha o mapa', 'Sai pelo mapa procurando titãs para abater.'],
+    ];
+    for (const [mode, label, cost, title] of modes) {
+      const btn = cmdButton(label, cost, '', title, () => setMode(this.sim, b.id, mode));
+      if (b.mode === mode) btn.classList.add('active-mode');
+      this.commands.appendChild(btn);
+    }
+    this.commands.appendChild(dangerButton('Desfazer batalhão', '', () => disbandBattalion(this.sim, b.id)));
+
+    // Membros: clicar torna comandante.
+    const list = el('div', 'bp-members wide');
+    list.appendChild(el('div', 'bp-sub', 'Membros (clique para tornar comandante):'));
+    for (const u of battalionUnits(this.sim, b)) {
+      const row = document.createElement('button');
+      row.className = `bp-member ${u.id === b.commanderId ? 'commander' : ''}`;
+      row.textContent = `${u.id === b.commanderId ? '★ ' : ''}${u.name} — ${rankName(u.level)}`;
+      row.title = u.id === b.commanderId ? 'Comandante' : 'Clique para tornar comandante';
+      if (u.id !== b.commanderId) row.onclick = () => setCommander(this.sim, b.id, u.id);
+      list.appendChild(row);
+    }
+    this.commands.append(list);
+  }
+
+  private buildMixed(battalions: number[], units: number[]): void {
+    this.info.append(el('div', 'bp-title', `${battalions.length} batalhão(ões)${units.length ? ` + ${units.length} unidade(s)` : ''}`));
+    for (const id of battalions) {
+      const b = battalionOf(this.sim, id);
+      if (b) this.info.append(el('div', 'bp-line', `${b.name}: ${b.memberIds.length + 1} soldados`));
+    }
+    this.info.append(el('div', 'bp-hint', 'Clique direito: todos se movem ou atacam juntos.'));
+    this.commands.appendChild(cmdButton('Parar', '', '', 'Interrompe a ordem atual', () => this.sel.stopSelected()));
+  }
+
+  private buildTrainingGround(b: Building): void {
+    const S = BALANCE.soldiers;
+    const t = trainer(this.sim, b);
+    const coach = el('div', 'bp-line');
+    const rate = el('div', 'bp-line');
+    this.info.append(coach, rate);
+    this.updaters.push(() => {
+      const tr = trainer(this.sim, b);
+      const list = trainees(this.sim, b).filter((u) => u !== tr);
+      coach.textContent = tr ? `Treinador: ${tr.name} — ${rankName(tr.level)}` : 'Sem treinador: escolha um soldado abaixo.';
+      coach.classList.toggle('warn', !tr);
+      const avg = list.length ? list.reduce((n, u) => n + trainingRate(tr, u), 0) / list.length : 0;
+      rate.textContent = `Alunos: ${list.length}/${S.trainingCapacity}${tr ? ` · ${avg.toFixed(1).replace('.', ',')} XP/s cada` : ''}`;
+    });
+    this.info.append(el('div', 'bp-hint', 'Mande soldados para cá com o botão direito. Alunos que já alcançaram o nível do treinador aprendem bem mais devagar.'));
+    const list = el('div', 'bp-members wide');
+    if (trainees(this.sim, b).length) list.appendChild(el('div', 'bp-sub', 'No campo (clique para tornar treinador):'));
+    for (const u of trainees(this.sim, b)) {
+      const row = document.createElement('button');
+      const isCoach = t?.id === u.id;
+      row.className = `bp-member ${isCoach ? 'commander' : ''}`;
+      row.textContent = `${isCoach ? '★ ' : ''}${u.name} — ${rankName(u.level)}`;
+      row.title = isCoach ? 'Treinador' : 'Clique para tornar treinador';
+      if (!isCoach) row.onclick = () => {
+        const err = setTrainer(this.sim, b.id, u.id);
+        if (err) this.toast(err);
+      };
+      list.appendChild(row);
+    }
+    if (trainees(this.sim, b).length) this.commands.appendChild(dangerButton('Dispensar todos', '', () => dismissTraining(this.sim, b.id)));
+    this.commands.append(list);
   }
 
   private buildHouseInfo(b: Building): void {

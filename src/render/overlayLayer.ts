@@ -6,6 +6,7 @@ import type { SelectionController } from '../input/selection';
 import { canAfford, canPlace } from '../systems/commands';
 import { titanRadius } from '../systems/damage';
 import { serviceRadius } from '../systems/city';
+import { unitMaxHp } from '../systems/modifiers';
 import { drawBuildingArt } from './buildingArt';
 
 // Marcadores de interface no mundo: seleção, barras de vida, progresso de construção,
@@ -31,12 +32,31 @@ export class OverlayLayer {
     const s = sel.selection;
     const pt0 = () => sel.placementTile();
 
+    // Batalhões selecionados: anel dourado em todos, anel duplo no comandante.
+    for (const bid of s.battalions) {
+      const b = sim.state.battalions.find((x) => x.id === bid);
+      if (!b) continue;
+      for (const id of [b.commanderId, ...b.memberIds]) {
+        const u = sim.unit(id);
+        if (!u || u.garrison) continue;
+        const r = UNIT_DEFS[u.kind].radius;
+        under.ellipse(u.x, u.y + 3, r + 4, (r + 4) * 0.6).stroke({ width: line, color: 0xffd34d });
+        if (id === b.commanderId) under.ellipse(u.x, u.y + 3, r + 8, (r + 8) * 0.6).stroke({ width: line, color: 0xffd34d });
+        bar(g, u.x - 9, u.y - r - 10, 18, u.hp / unitMaxHp(sim.state, u), 0x5bd34a);
+      }
+      if (b.mode === 'defend' && b.guard) {
+        const gx = (b.guard.tx + 0.5) * ts;
+        const gy = (b.guard.ty + 0.5) * ts;
+        under.circle(gx, gy, BALANCE.soldiers.defendRadius * ts).stroke({ width: line, color: 0xffd34d, alpha: 0.35 });
+      }
+    }
+
     for (const id of s.units) {
       const u = sim.unit(id);
       if (!u) continue;
       const r = UNIT_DEFS[u.kind].radius;
       under.ellipse(u.x, u.y + 3, r + 4, (r + 4) * 0.6).stroke({ width: line, color: 0x7cff6b });
-      if (s.units.length <= 30) bar(g, u.x - 9, u.y - r - 10, 18, u.hp / UNIT_DEFS[u.kind].maxHp, 0x5bd34a);
+      if (s.units.length <= 30) bar(g, u.x - 9, u.y - r - 10, 18, u.hp / unitMaxHp(sim.state, u), 0x5bd34a);
     }
 
     for (const b of sim.state.buildings) {

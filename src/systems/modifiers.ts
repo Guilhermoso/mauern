@@ -52,12 +52,19 @@ export function buildingMaxHp(state: GameState, b: Building): number {
   return Math.round(hp);
 }
 
+// Soldados ficam mais fortes a cada nível de experiência.
+function levelBonus(u: Unit, perLevel: number): number {
+  return UNIT_DEFS[u.kind].military ? 1 + perLevel * ((u.level ?? 1) - 1) : 1;
+}
+
 export function unitMaxHp(state: GameState, u: Unit): number {
-  return UNIT_DEFS[u.kind].maxHp + (u.kind === 'militia' ? flat(state, 'militiaHp') : 0);
+  const base = UNIT_DEFS[u.kind].maxHp + (u.kind === 'militia' ? flat(state, 'militiaHp') : 0);
+  return Math.round(base * levelBonus(u, BALANCE.soldiers.hpPerLevel));
 }
 
 export function unitAttack(state: GameState, u: Unit): number {
-  return UNIT_DEFS[u.kind].attack + (u.kind === 'militia' ? flat(state, 'militiaAttack') : 0);
+  const base = UNIT_DEFS[u.kind].attack + (u.kind === 'militia' ? flat(state, 'militiaAttack') : 0);
+  return base * levelBonus(u, BALANCE.soldiers.attackPerLevel);
 }
 
 export function carryCapacity(state: GameState, u: Unit): number {

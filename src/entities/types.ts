@@ -26,7 +26,8 @@ export type BuildingKind =
   | 'gate'
   | 'watchTower'
   | 'well'
-  | 'bonfire';
+  | 'bonfire'
+  | 'trainingGround';
 
 export interface TrainItem {
   kind: UnitKind;
@@ -55,6 +56,7 @@ export interface Building {
   needHours: number; // casas: horas seguidas com as necessidades do próximo nível atendidas
   missingHours: number; // casas: horas seguidas sem as necessidades do nível atual
   research: { tech: string; progress: number } | null;
+  trainerId: number; // campo de treinamento: soldado que comanda o treino (0 = nenhum)
 }
 
 export type UnitKind = 'villager' | 'scout' | 'militia';
@@ -75,7 +77,9 @@ export type UnitOrder =
   | { type: 'build'; buildingId: number }
   | { type: 'deliver'; buildingId: number }
   | { type: 'attack'; titanId: number }
-  | { type: 'garrison'; buildingId: number };
+  | { type: 'garrison'; buildingId: number }
+  | { type: 'train'; buildingId: number }
+  | { type: 'follow' }; // membro de batalhão seguindo o comandante em formação
 
 export interface Unit {
   id: number;
@@ -95,6 +99,25 @@ export interface Unit {
   garrison: number; // edifício onde está abrigada (0 = fora)
   attackCooldown: number;
   prevOrder: UnitOrder | null; // ordem a retomar quando o sino de alarme for desligado
+  level: number; // soldados: 1 a 100
+  xp: number; // experiência acumulada no nível atual
+  battalion: number; // batalhão ao qual pertence (0 = avulso)
+  speedCap: number; // velocidade máxima imposta pelo batalhão (0 = sem limite)
+}
+
+export type BattalionMode = 'manual' | 'defend' | 'hunt';
+
+export type BattalionOrder = { type: 'idle' } | { type: 'move'; tx: number; ty: number } | { type: 'attack'; titanId: number };
+
+export interface Battalion {
+  id: number;
+  name: string;
+  commanderId: number;
+  memberIds: number[]; // sem o comandante
+  mode: BattalionMode;
+  order: BattalionOrder;
+  guard: { tx: number; ty: number } | null; // modo defender: ponto a proteger
+  patrol: { tx: number; ty: number } | null; // modo caçar: destino da busca
 }
 
 export type TitanKind = 'common';

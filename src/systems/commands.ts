@@ -7,6 +7,7 @@ import { TILE_INFO } from '../world/terrain';
 import { getTile } from '../world/world';
 import { farmTaken, findNearestNode, isExposed } from './queries';
 import { buildingMaxHp } from './modifiers';
+import { commandTrain } from './soldiers';
 import { setOrder } from './units';
 import { ejectGarrison, removeBuilding, titanRadius } from './damage';
 
@@ -165,9 +166,12 @@ export function smartCommand(sim: Sim, ids: readonly number[], wx: number, wy: n
     const builders = list.filter((u) => UNIT_DEFS[u.kind].canBuild);
     const others = list.filter((u) => !UNIT_DEFS[u.kind].canBuild).map((u) => u.id);
     const bIds = builders.map((u) => u.id);
-    // Militares: abrigam-se em torres e no Centro da Vila; senão, só andam até lá.
+    // Militares: treinam no campo de treinamento, abrigam-se em torres e no Centro da Vila; senão, só andam até lá.
     if (others.length) {
-      if (b.built && def.garrison > 0) commandGarrison(sim, others, b.id);
+      if (b.built && b.kind === 'trainingGround') {
+        const err = commandTrain(sim, others, b.id);
+        if (err) return err;
+      } else if (b.built && def.garrison > 0) commandGarrison(sim, others, b.id);
       else commandMove(sim, others, tx, ty);
     }
     if (!builders.length) return null;

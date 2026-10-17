@@ -9,6 +9,8 @@ import type { Building, Unit, UnitOrder } from '../entities/types';
 import type { Goal } from '../world/pathfinding';
 import { clearPath, face, moveTo, separateUnits } from './movement';
 import { autoAcquire, updateAttack, updateGarrisonOrder } from './combat';
+import { updateTraining } from './soldiers';
+import { updateFollow } from './battalions';
 import {
   buildingCenter,
   findFreeFarm,
@@ -43,13 +45,19 @@ export function updateUnits(sim: Sim): void {
     switch (o.type) {
       case 'idle':
         u.moving = false;
-        autoAcquire(sim, u);
+        if (!u.battalion) autoAcquire(sim, u);
         break;
       case 'attack':
         if (!updateAttack(sim, u, o)) {
           setIdle(u);
-          autoAcquire(sim, u);
+          if (!u.battalion) autoAcquire(sim, u);
         }
+        break;
+      case 'train':
+        if (!updateTraining(sim, u, o)) setIdle(u);
+        break;
+      case 'follow':
+        updateFollow(sim, u);
         break;
       case 'garrison':
         if (!updateGarrisonOrder(sim, u, o) && !u.garrison) setIdle(u);
@@ -351,6 +359,13 @@ export function unitStatus(sim: Sim, u: Unit): string {
       return u.moving ? 'Avançando contra um titã' : 'Lutando contra um titã';
     case 'garrison':
       return 'Indo se abrigar';
+    case 'train': {
+      const f = sim.building(o.buildingId);
+      if (f && f.trainerId === u.id) return 'Treinador do campo de treinamento';
+      return u.moving ? 'Indo treinar' : f && f.trainerId && sim.unit(f.trainerId) ? 'Treinando combate' : 'Esperando um treinador';
+    }
+    case 'follow':
+      return u.moving ? 'Marchando com o batalhão' : 'Em formação';
   }
 }
 

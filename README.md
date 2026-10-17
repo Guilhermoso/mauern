@@ -22,6 +22,14 @@ A **moral** (barra superior; passe o mouse para ver o porquê) acelera ou atrasa
 Pesquise tecnologias nos edifícios, cumpra as **Crônicas** para ganhar relíquias e acompanhe no botão da era
 os marcos para evoluir. De tempos em tempos um evento pede uma decisão sua.
 
+**Soldados e batalhões:** cada soldado tem experiência e nível (1 a 100), com 100 patentes — de Recruta I a
+Comandante Supremo V. Subir de nível aumenta vida e ataque. Eles ganham experiência lutando contra titãs e
+treinando no **Campo de Treinamento**: mande soldados para lá e escolha um deles como treinador (quanto maior
+o nível do treinador, mais rápido os outros aprendem; ele também ganha experiência ensinando). Forme
+**batalhões** (tecla B com soldados selecionados): o de maior nível comanda, e o nível dele define quantos
+soldados cabem. O batalhão anda em formação, é selecionado como um só e pode ficar no modo manual, defender
+uma posição ou caçar titãs pelo mapa.
+
 | Ação | Controle |
 | --- | --- |
 | Selecionar | Clique esquerdo; arraste para selecionar várias unidades; Shift+clique adiciona |
@@ -31,6 +39,8 @@ os marcos para evoluir. De tempos em tempos um evento pede uma decisão sua.
 | Pesquisar tecnologias | Selecione o edifício (Centro da Vila, depósitos, moinho, torre) e use os botões azuis |
 | Paliçada (com aldeão selecionado) | Z e arraste para traçar a linha · X portão (pode ser posto sobre a paliçada) |
 | Treinar (Centro da Vila selecionado) | Q aldeão · E miliciano (Shift treina 5) |
+| Campo de treinamento (com aldeão selecionado) | Y. Depois: clique direito no campo com soldados e escolha o treinador no painel |
+| Formar batalhão | B com soldados selecionados · modos e "Desfazer" no painel do batalhão |
 | Atacar um titã | Selecione unidades e clique direito no titã |
 | Abrigar unidades | Clique direito no Centro da Vila ou numa torre · U libera os abrigados |
 | Sino de alarme (Centro da Vila selecionado) | B toca / desliga: aldeões se abrigam e depois voltam ao trabalho |

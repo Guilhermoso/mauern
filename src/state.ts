@@ -3,6 +3,7 @@ import { Rng, hashString } from './core/rng';
 import { generateWorld } from './world/generate';
 import type { World } from './world/world';
 import type {
+  Battalion,
   Building,
   BuildingKind,
   CityState,
@@ -18,7 +19,7 @@ import type {
 import { BUILDING_DEFS, UNIT_DEFS } from './data/defs';
 import { randomName } from './entities/names';
 
-export const SAVE_VERSION = 4;
+export const SAVE_VERSION = 5;
 
 export interface LogEntry {
   tick: number;
@@ -53,6 +54,8 @@ export interface GameState {
   stats: Stats;
   city: CityState;
   events: EventState;
+  battalions: Battalion[];
+  battalionCount: number; // para numerar os batalhões (1º, 2º, ...)
   nextId: number;
   camera: CameraState;
   log: LogEntry[];
@@ -104,6 +107,8 @@ export function createNewGame(seed: string): GameState {
     stats: newStats(),
     city: { starving: false, cold: false, hungerThisWinter: false, taxCarry: 0 },
     events: { nextDay: BALANCE.events.firstDay, active: null },
+    battalions: [],
+    battalionCount: 0,
     nextId,
     camera: { x: centerX, y: centerY, zoom: 1 },
     log: [{ tick: 0, text: 'Um pequeno grupo de sobreviventes funda um refúgio. Que estas terras nos protejam.' }],
@@ -125,6 +130,7 @@ export function newBuilding(id: number, kind: BuildingKind, tx: number, ty: numb
     needHours: 0,
     missingHours: 0,
     research: null,
+    trainerId: 0,
   };
 }
 
@@ -169,6 +175,10 @@ export function newUnit(id: number, kind: UnitKind, name: string, x: number, y: 
     garrison: 0,
     attackCooldown: 0,
     prevOrder: null,
+    level: 1,
+    xp: 0,
+    battalion: 0,
+    speedCap: 0,
   };
 }
 

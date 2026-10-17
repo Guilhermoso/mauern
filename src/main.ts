@@ -216,6 +216,7 @@ async function boot(): Promise<void> {
     chronicle: 0,
     research: 0,
     event: 0,
+    promotion: 1500,
   };
   const handleAlert = (a: Alert) => {
     const now = performance.now();
@@ -245,6 +246,9 @@ async function boot(): Promise<void> {
         break;
       case 'event':
         chime();
+        break;
+      case 'promotion':
+        hud.toast(a.text, goTo, false, true);
         break;
     }
   };

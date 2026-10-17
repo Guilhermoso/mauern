@@ -15,12 +15,14 @@ import {
   trainUnit,
 } from '../systems/commands';
 import { idleVillagers } from '../systems/queries';
+import { battalionCommand, battalionOf, formBattalion } from '../systems/battalions';
 import { ringAlarm, stopAlarm } from '../systems/combat';
 import { ungarrison } from '../systems/commands';
 import { setIdle } from '../systems/units';
 
 export interface Selection {
-  units: number[];
+  units: number[]; // unidades avulsas
+  battalions: number[]; // batalhões (selecionados como um só)
   building: number | null;
   node: number | null;
   titan: number | null;
@@ -37,7 +39,7 @@ export interface CommandMarker {
 // grupos de controle, atalhos e modo de posicionamento de edifícios.
 // A seleção é estado da interface: não faz parte do save.
 export class SelectionController {
-  selection: Selection = { units: [], building: null, node: null, titan: null };
+  selection: Selection = { units: [], battalions: [], building: null, node: null, titan: null };
   placing: BuildingKind | null = null;
   wallStart: { tx: number; ty: number } | null = null; // início da linha de muralha sendo arrastada
   mouseScreen = { x: 0, y: 0 };
@@ -99,9 +101,27 @@ export class SelectionController {
     return w > 5 || h > 5 ? { x, y, w, h } : null;
   }
 
+  // Unidades de um batalhão nunca ficam selecionadas sozinhas: viram a seleção do batalhão inteiro.
   setSelection(sel: Partial<Selection>): void {
-    this.selection = { units: sel.units ?? [], building: sel.building ?? null, node: sel.node ?? null, titan: sel.titan ?? null };
+    const loose: number[] = [];
+    const bats = new Set(sel.battalions ?? []);
+    for (const id of sel.units ?? []) {
+      const u = this.sim.unit(id);
+      if (u?.battalion) bats.add(u.battalion);
+      else loose.push(id);
+    }
+    this.selection = { units: loose, battalions: [...bats], building: sel.building ?? null, node: sel.node ?? null, titan: sel.titan ?? null };
     this.changed = true;
+  }
+
+  // Todas as unidades selecionadas (avulsas e dos batalhões).
+  allSelectedUnits(): number[] {
+    const ids = [...this.selection.units];
+    for (const b of this.selection.battalions) {
+      const bat = battalionOf(this.sim, b);
+      if (bat) ids.push(bat.commanderId, ...bat.memberIds);
+    }
+    return ids;
   }
 
   clear(): void {
@@ -119,8 +139,11 @@ export class SelectionController {
     const building = s.building !== null && this.sim.building(s.building) ? s.building : null;
     const node = s.node !== null && this.sim.node(s.node) ? s.node : null;
     const titan = s.titan !== null && this.sim.titan(s.titan) ? s.titan : null;
-    if (units.length !== s.units.length || building !== s.building || node !== s.node || titan !== s.titan) {
-      this.setSelection({ units, building, node, titan });
+    const battalions = s.battalions.filter((id) => battalionOf(this.sim, id));
+    // Unidade avulsa que entrou num batalhão também precisa ser reagrupada.
+    const regroup = units.some((id) => this.sim.unit(id)?.battalion);
+    if (regroup || units.length !== s.units.length || battalions.length !== s.battalions.length || building !== s.building || node !== s.node || titan !== s.titan) {
+      this.setSelection({ units, battalions, building, node, titan });
     }
     if (this.placing && this.selectedVillagers().length === 0) this.placing = null;
   }
@@ -196,6 +219,11 @@ export class SelectionController {
     const tx = Math.floor(m.x / ts);
     const ty = Math.floor(m.y / ts);
     const s = this.selection;
+    for (const b of s.battalions) battalionCommand(this.sim, b, m.x, m.y);
+    if (s.battalions.length && !s.units.length) {
+      const enemy = titanAt(this.sim, m.x, m.y) !== null;
+      this.markers.push({ x: m.x, y: m.y, time: performance.now(), color: enemy ? 0xff4a3a : 0x7cff6b });
+    }
     if (s.units.length) {
       const err = smartCommand(this.sim, s.units, m.x, m.y);
       if (err) this.toast(err);
@@ -241,11 +269,15 @@ export class SelectionController {
           .filter((u) => u.kind === unit.kind && u.x >= v.x && u.x <= v.x + v.w && u.y >= v.y && u.y <= v.y + v.h)
           .map((u) => u.id);
         this.setSelection({ units: same });
-      } else if (additive && this.selection.units.length) {
-        const units = this.selection.units.includes(unitId)
-          ? this.selection.units.filter((id) => id !== unitId)
-          : [...this.selection.units, unitId];
-        this.setSelection({ units });
+      } else if (additive && (this.selection.units.length || this.selection.battalions.length)) {
+        const sel = this.selection;
+        if (unit.battalion) {
+          const battalions = sel.battalions.includes(unit.battalion) ? sel.battalions.filter((b) => b !== unit.battalion) : [...sel.battalions, unit.battalion];
+          this.setSelection({ units: sel.units, battalions });
+        } else {
+          const units = sel.units.includes(unitId) ? sel.units.filter((id) => id !== unitId) : [...sel.units, unitId];
+          this.setSelection({ units, battalions: sel.battalions });
+        }
       } else {
         this.setSelection({ units: [unitId] });
       }
@@ -278,7 +310,7 @@ export class SelectionController {
     const b = this.camera.screenToWorld(rect.x + rect.w, rect.y + rect.h);
     const inside = this.sim.state.units.filter((u) => !u.garrison && u.x >= a.x && u.x <= b.x && u.y >= a.y && u.y <= b.y).map((u) => u.id);
     if (additive) {
-      this.setSelection({ units: [...new Set([...this.selection.units, ...inside])] });
+      this.setSelection({ units: [...new Set([...this.selection.units, ...inside])], battalions: this.selection.battalions });
     } else if (inside.length) {
       this.setSelection({ units: inside });
     } else {
@@ -289,7 +321,7 @@ export class SelectionController {
   centerOnSelection(): void {
     const s = this.selection;
     const ts = BALANCE.world.tileSize;
-    const units = s.units.map((id) => this.sim.unit(id)).filter((u) => !!u && !u.garrison);
+    const units = this.allSelectedUnits().map((id) => this.sim.unit(id)).filter((u) => !!u && !u.garrison);
     if (units.length) {
       const x = units.reduce((sum, u) => sum + u!.x, 0) / units.length;
       const y = units.reduce((sum, u) => sum + u!.y, 0) / units.length;
@@ -314,7 +346,24 @@ export class SelectionController {
     this.centerOnSelection();
   }
 
+  formBattalionFromSelection(): void {
+    const { battalion, error, leftOut } = formBattalion(this.sim, this.selection.units);
+    if (error) {
+      this.toast(error);
+      return;
+    }
+    if (leftOut) this.toast(`${leftOut} soldado(s) não couberam: o nível do comandante limita o tamanho do batalhão.`);
+    this.setSelection({ battalions: [...this.selection.battalions, battalion!.id], units: this.selection.units.filter((id) => !this.sim.unit(id)?.battalion) });
+  }
+
   stopSelected(): void {
+    for (const b of this.selection.battalions) {
+      const bat = battalionOf(this.sim, b);
+      if (bat) {
+        bat.mode = 'manual';
+        bat.order = { type: 'idle' };
+      }
+    }
     for (const id of this.selection.units) {
       const u = this.sim.unit(id);
       if (u) setIdle(u);
@@ -348,7 +397,7 @@ export class SelectionController {
         this.cancelPlacing();
         return true;
       }
-      if (s.units.length || s.building !== null || s.node !== null || s.titan !== null) {
+      if (s.units.length || s.battalions.length || s.building !== null || s.node !== null || s.titan !== null) {
         this.clear();
         return true;
       }
@@ -359,14 +408,14 @@ export class SelectionController {
       const d = Number(digit[1]);
       if (e.ctrlKey || e.metaKey) {
         e.preventDefault();
-        this.groups.set(d, { units: [...s.units], building: s.building, node: null, titan: null });
+        this.groups.set(d, { units: [...s.units], battalions: [...s.battalions], building: s.building, node: null, titan: null });
         this.toast(`Grupo ${d} definido.`);
         return true;
       }
       const g = this.groups.get(d);
       if (g) {
         const now = performance.now();
-        this.setSelection({ units: g.units.filter((id) => this.sim.unit(id)), building: g.building });
+        this.setSelection({ units: g.units.filter((id) => this.sim.unit(id)), battalions: g.battalions, building: g.building });
         this.prune();
         if (this.lastGroupKey.digit === d && now - this.lastGroupKey.time < 400) this.centerOnSelection();
         this.lastGroupKey = { digit: d, time: now };
@@ -387,6 +436,10 @@ export class SelectionController {
         this.setSelection({ building: tc.id });
         this.centerOnSelection();
       }
+      return true;
+    }
+    if (e.code === 'KeyB' && s.units.some((id) => { const u = this.sim.unit(id); return u && UNIT_DEFS[u.kind].military; })) {
+      this.formBattalionFromSelection();
       return true;
     }
     if (this.selectedVillagers().length) {

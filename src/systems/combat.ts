@@ -7,6 +7,7 @@ import { clearPath, moveTo, stepToward } from './movement';
 import { ejectGarrison, garrisonCount, killTitan, titanRadius } from './damage';
 import { buildingCenter } from './queries';
 import { flat, unitAttack } from './modifiers';
+import { gainXp } from './soldiers';
 
 const TPS = BALANCE.time.ticksPerSecond;
 const DT = 1 / TPS;
@@ -14,10 +15,23 @@ const DT = 1 / TPS;
 type AttackOrder = Extract<UnitOrder, { type: 'attack' }>;
 type GarrisonOrder = Extract<UnitOrder, { type: 'garrison' }>;
 
-export function hitTitan(sim: Sim, t: Titan, damage: number): void {
+// Dano em titã. Se veio de um soldado, ele ganha experiência (e, no abate, o batalhão também).
+export function hitTitan(sim: Sim, t: Titan, damage: number, attacker?: Unit): void {
   t.hp -= damage;
   t.lastHitTick = sim.state.tick;
-  if (t.hp <= 0) killTitan(sim, t);
+  const S = BALANCE.soldiers;
+  if (attacker) gainXp(sim, attacker, damage * S.xpPerDamage);
+  if (t.hp <= 0) {
+    killTitan(sim, t);
+    if (attacker) {
+      const bonus = S.xpPerKillPerMeter * t.height;
+      gainXp(sim, attacker, bonus);
+      if (attacker.battalion) {
+        const others = sim.state.units.filter((u) => u.battalion === attacker.battalion && u !== attacker);
+        for (const u of others) gainXp(sim, u, (bonus * S.battalionShareOfKill) / others.length);
+      }
+    }
+  }
 }
 
 export function nearestTitan(sim: Sim, x: number, y: number, radiusPx: number): Titan | undefined {
@@ -47,7 +61,7 @@ export function updateAttack(sim: Sim, u: Unit, o: AttackOrder): boolean {
     if (u.attackCooldown <= 0) {
       u.attackCooldown = def.attackCooldown;
       sim.fx.push({ type: 'hit', x: t.x, y: t.y });
-      hitTitan(sim, t, unitAttack(sim.state, u));
+      hitTitan(sim, t, unitAttack(sim.state, u), u);
     }
     return true;
   }

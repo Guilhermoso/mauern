@@ -106,6 +106,13 @@ export const BUILDING_DEFS: Record<BuildingKind, BuildingDef> = {
     size: 1, maxHp: 250, housing: 0, cost: { wood: 30, stone: 20 }, buildTime: 15,
     dropsite: [], walkable: false, trains: [], hotkey: 'KeyV', garrison: 0,
   },
+  trainingGround: {
+    name: 'Campo de Treinamento',
+    feminine: false,
+    description: 'Soldados treinam combate aqui. Escolha um deles como treinador: quanto maior o nível dele, mais rápido os outros aprendem.',
+    size: 4, maxHp: 800, housing: 0, cost: { wood: 150, stone: 40 }, buildTime: 40,
+    dropsite: [], walkable: true, trains: [], hotkey: 'KeyY', garrison: 0,
+  },
   bonfire: {
     name: 'Fogueira Comunitária',
     feminine: true,
@@ -116,7 +123,7 @@ export const BUILDING_DEFS: Record<BuildingKind, BuildingDef> = {
 };
 
 // Ordem dos botões no menu de construção do aldeão.
-export const VILLAGER_BUILDS: BuildingKind[] = ['house', 'well', 'bonfire', 'lumberCamp', 'miningCamp', 'mill', 'farm', 'palisade', 'gate', 'watchTower'];
+export const VILLAGER_BUILDS: BuildingKind[] = ['house', 'well', 'bonfire', 'lumberCamp', 'miningCamp', 'mill', 'farm', 'palisade', 'gate', 'watchTower', 'trainingGround'];
 
 export interface UnitDef {
   name: string;

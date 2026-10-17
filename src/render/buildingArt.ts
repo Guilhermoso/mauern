@@ -176,6 +176,26 @@ function drawFinished(kind: BuildingKind, size: number, level = 1): BuildingArt 
       }
       break;
     }
+    case 'trainingGround': {
+      // Arena de areia cercada, com bonecos de palha e um suporte de armas.
+      g.rect(2, 2, size - 4, size - 4).fill(0xc2a874);
+      for (let i = 0; i < 40; i++) g.circle(6 + ((i * 37) % (size - 12)), 6 + ((i * 53) % (size - 12)), 1.2).fill(0xa88f5c);
+      g.rect(1, 1, size - 2, size - 2).stroke({ width: 3, color: 0x7a5230 });
+      for (let x = 1; x < size; x += 16) {
+        g.rect(x - 2, -1, 4, 5).fill(0x5a3d22);
+        g.rect(x - 2, size - 4, 4, 5).fill(0x5a3d22);
+      }
+      for (const [x, y] of [[size * 0.3, size * 0.35], [size * 0.7, size * 0.35]]) {
+        g.ellipse(x + 3, y + 5, 8, 4).fill({ color: 0x000000, alpha: 0.25 });
+        g.rect(x - 1.5, y - 2, 3, 12).fill(0x6b4a2a);
+        g.circle(x, y, 6).fill(0xd9c27a).stroke({ width: 1, color: 0x9c8648 });
+        g.rect(x - 8, y + 1, 16, 2.5).fill(0xd9c27a);
+      }
+      // Suporte de lanças
+      g.rect(size - 26, size - 18, 18, 4).fill(0x6b4a2a);
+      for (let i = 0; i < 4; i++) g.rect(size - 25 + i * 5, size - 30, 1.5, 16).fill(0x8b5e34);
+      break;
+    }
     case 'well': {
       g.ellipse(18, 20, 13, 9).fill({ color: 0x000000, alpha: 0.25 });
       g.circle(16, 16, 12).fill(0x8e877b);

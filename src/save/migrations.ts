@@ -77,6 +77,15 @@ const MIGRATIONS: Record<number, Migration> = {
       titans: save.titans.map((t: any) => ({ ...t, horde: false })),
     };
   },
+  // v4 → v5: experiência e patentes dos soldados, campos de treinamento e batalhões.
+  4: (save) => ({
+    ...save,
+    version: 5,
+    battalions: [],
+    battalionCount: 0,
+    buildings: save.buildings.map((b: any) => ({ ...b, trainerId: 0 })),
+    units: save.units.map((u: any) => ({ ...u, level: 1, xp: 0, battalion: 0, speedCap: 0 })),
+  }),
 };
 
 export function migrate(save: any): GameState {

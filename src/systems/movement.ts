@@ -65,8 +65,15 @@ export function moveTo(sim: Sim, u: Unit, goal: Goal): MoveResult {
 }
 
 // Anda um passo em direção ao ponto. Retorna true se chegou.
-export function stepToward(u: { x: number; y: number; facing: number; moving?: boolean; kind?: string }, x: number, y: number, speed?: number): boolean {
-  const step = (speed ?? UNIT_DEFS[u.kind as Unit['kind']].speed) * DT;
+export function stepToward(
+  u: { x: number; y: number; facing: number; moving?: boolean; kind?: string; speedCap?: number },
+  x: number,
+  y: number,
+  speed?: number,
+): boolean {
+  let base = speed ?? UNIT_DEFS[u.kind as Unit['kind']].speed;
+  if (speed === undefined && u.speedCap) base = Math.min(base, u.speedCap);
+  const step = base * DT;
   const dx = x - u.x;
   const dy = y - u.y;
   const d = Math.hypot(dx, dy);
@@ -130,8 +137,17 @@ export function separateUnits(sim: Sim): void {
             d = 1;
           }
           const push = (min - d) * (u.moving ? 0.15 : 0.35);
-          px += (dx / d) * push;
-          py += (dy / d) * push;
+          if (!u.moving && o.moving) {
+            // Quem está parado dá um passo para o lado (em vez de ser empurrado pelo caminho todo).
+            const sx = -Math.sin(o.facing);
+            const sy = Math.cos(o.facing);
+            const side = dx * sx + dy * sy >= 0 ? 1 : -1;
+            px += sx * side * push;
+            py += sy * side * push;
+          } else {
+            px += (dx / d) * push;
+            py += (dy / d) * push;
+          }
         }
       }
     }

@@ -28,8 +28,13 @@ interface UnitView {
   body: Graphics;
   carry: Graphics;
   tool: Graphics;
+  badge: Graphics;
   carryKey: string;
+  badgeKey: string;
 }
+
+// Cor da insígnia por grupo de patentes: praças, sargentos, oficiais, oficiais superiores, generais.
+const BADGE_COLORS = [0xb07a45, 0xc0c4c8, 0xe8c24a, 0x6fc3e8, 0xe0504a];
 
 export class EntityLayer {
   readonly container = new Container();
@@ -59,8 +64,8 @@ export class EntityLayer {
         this.buildings.set(b.id, v);
         this.container.addChild(v.art.root);
       }
-      // Fazendas ficam sempre por baixo das unidades.
-      v.art.root.zIndex = b.kind === 'farm' ? -1e6 + b.ty : (b.ty + def.size) * ts;
+      // Edifícios que se pode atravessar (fazenda, campo de treinamento) ficam sempre por baixo das unidades.
+      v.art.root.zIndex = def.walkable ? -1e6 + b.ty : (b.ty + def.size) * ts;
       if (v.art.blades) v.art.blades.rotation = timeSec * 0.6 + b.id;
       if (v.art.flame) {
         // Chama que tremula.
@@ -85,7 +90,8 @@ export class EntityLayer {
         this.units.set(u.id, v);
         this.container.addChild(v.root);
       }
-      updateUnitView(v, u, timeSec);
+      const commander = u.battalion ? state.battalions.find((b) => b.id === u.battalion)?.commanderId === u.id : false;
+      updateUnitView(v, u, timeSec, commander);
     }
     for (const [id, v] of this.units) {
       if (!aliveU.has(id)) {
@@ -153,14 +159,36 @@ function createUnitView(u: Unit): UnitView {
     body.circle(-1, 0, 5).fill(PLAYER_COLOR);
     body.circle(-1, -0.5, 2.8).fill(0xe8c39e);
   }
-  root.addChild(tool, body, carry);
-  return { root, body, carry, tool, carryKey: '' };
+  const badge = new Graphics();
+  root.addChild(tool, body, carry, badge);
+  return { root, body, carry, tool, badge, carryKey: '', badgeKey: '' };
 }
 
-function updateUnitView(v: UnitView, u: Unit, timeSec: number): void {
+// Insígnia: um ponto colorido pelo grupo de patentes, com 1 a 5 traços conforme o grau;
+// o comandante de batalhão leva um estandarte.
+function drawBadge(g: Graphics, u: Unit, commander: boolean): void {
+  g.clear();
+  if (u.kind === 'villager') return;
+  const tier = Math.min(4, Math.floor((u.level - 1) / 20));
+  const grade = ((u.level - 1) % 5) + 1;
+  g.circle(-7, -9, 3).fill(BADGE_COLORS[tier]).stroke({ width: 0.8, color: 0x000000, alpha: 0.6 });
+  for (let i = 0; i < grade; i++) g.rect(-3 + i * 2.2, -10.5, 1.4, 3).fill(BADGE_COLORS[tier]);
+  if (commander) {
+    g.rect(5, -20, 1.5, 16).fill(0x3a2e22);
+    g.poly([6.5, -20, 16, -17, 6.5, -14]).fill(0xd9a441).stroke({ width: 0.6, color: 0x5a3d22 });
+  }
+}
+
+function updateUnitView(v: UnitView, u: Unit, timeSec: number, commander = false): void {
   v.root.visible = !u.garrison;
   if (u.garrison) return;
-  const working = !u.moving && (u.order.type === 'gather' || u.order.type === 'build' || u.order.type === 'farm' || u.order.type === 'attack');
+  const badgeKey = `${u.level}|${commander}`;
+  if (badgeKey !== v.badgeKey) {
+    v.badgeKey = badgeKey;
+    drawBadge(v.badge, u, commander);
+  }
+  const training = u.order.type === 'train' && !u.moving;
+  const working = !u.moving && (u.order.type === 'gather' || u.order.type === 'build' || u.order.type === 'farm' || u.order.type === 'attack' || training);
   // Andando: balança mais; parado: respiração leve.
   const bob = u.moving ? Math.abs(Math.sin(timeSec * 12 + u.id)) * -1.5 : Math.sin(timeSec * 2 + u.id) * 0.6;
   v.root.position.set(u.x, u.y + bob);
