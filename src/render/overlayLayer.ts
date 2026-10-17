@@ -22,7 +22,7 @@ export class OverlayLayer {
     this.over.addChild(this.g);
   }
 
-  update(sim: Sim, sel: SelectionController, zoom: number): void {
+  update(sim: Sim, sel: SelectionController, zoom: number, animSec = performance.now() / 1000): void {
     const ts = BALANCE.world.tileSize;
     const under = this.under;
     const g = this.g;
@@ -40,7 +40,7 @@ export class OverlayLayer {
     }
 
     // Brilho dourado em volta de todo comandante de batalhão (bônus de liderança).
-    const pulse = 0.25 + 0.15 * Math.sin(performance.now() / 300);
+    const pulse = 0.25 + 0.15 * Math.sin((animSec * 1000) / 300);
     for (const bat of sim.state.battalions) {
       const c = sim.unit(bat.commanderId);
       if (!c || c.garrison) continue;

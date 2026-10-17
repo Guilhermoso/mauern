@@ -45,6 +45,9 @@ const BADGE_COLORS = [0xb07a45, 0xc0c4c8, 0xe8c24a, 0x6fc3e8, 0xe0504a];
 
 export class EntityLayer {
   readonly container = new Container();
+  // Edifícios que se pode atravessar (fazendas, campos de treinamento, refúgio...): ficam no chão,
+  // abaixo das sombras e dos anéis de seleção das unidades que estão em cima deles.
+  readonly ground = new Container();
   // Sombras dos edifícios: desenhadas opacas e com transparência aplicada à camada inteira, para que
   // sombras sobrepostas não escureçam em dobro. Fica abaixo de todos os edifícios e unidades.
   readonly shadows = new Container();
@@ -88,7 +91,7 @@ export class EntityLayer {
         v = { art, key, shadow, shadowKey: '' };
         v.art.root.position.set(b.tx * ts, b.ty * ts);
         this.buildings.set(b.id, v);
-        this.container.addChild(v.art.root);
+        (def.walkable ? this.ground : this.container).addChild(v.art.root);
       }
       // Edifícios que se pode atravessar (fazenda, campo de treinamento) ficam sempre por baixo das unidades.
       v.art.root.zIndex = def.walkable ? -1e6 + b.ty : (b.ty + def.size) * ts;

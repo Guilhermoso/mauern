@@ -71,7 +71,7 @@ async function boot(): Promise<void> {
   const entities = new EntityLayer();
   const overlay = new OverlayLayer();
   const fx = new FxLayer();
-  world.addChild(terrain.container, entities.shadows, overlay.under, entities.container, fx.g, overlay.over);
+  world.addChild(terrain.container, entities.ground, entities.shadows, overlay.under, entities.container, fx.g, overlay.over);
   const lighting = new Lighting();
   app.stage.addChild(world, lighting.overlay, overlay.screen);
 
@@ -292,9 +292,14 @@ async function boot(): Promise<void> {
   // --- Laço principal ---
   const loop = new FixedLoop(() => step(sim));
   let hudTimer = 0;
+  // Relógio das animações (passos, lanças, chamas, pás do moinho): só anda com o jogo rodando,
+  // para tudo congelar na pausa, no menu e nas cartas de evento.
+  let animSec = 0;
   app.ticker.add((ticker) => {
     const dtMs = ticker.deltaMS;
     loop.advance(dtMs, state.speed);
+    const animDt = state.speed > 0 ? dtMs / 1000 : 0;
+    animSec += animDt;
 
     camera.screenW = app.screen.width;
     camera.screenH = app.screen.height;
@@ -311,18 +316,18 @@ async function boot(): Promise<void> {
       sim.terrainChanges = [];
     }
     terrain.update(camera.viewRect());
-    entities.sync(sim, performance.now() / 1000);
+    entities.sync(sim, animSec);
     if (sim.fx.length) {
       fx.add(sim.fx);
       sim.fx = [];
     }
-    fx.update(dtMs / 1000);
+    fx.update(animDt);
     if (sim.alerts.length) {
       for (const a of sim.alerts) handleAlert(a);
       sim.alerts = [];
     }
-    overlay.update(sim, selection, camera.zoom);
-    lighting.update(getClock(state.tick).dayFraction, camera, state, performance.now() / 1000);
+    overlay.update(sim, selection, camera.zoom, animSec);
+    lighting.update(getClock(state.tick).dayFraction, camera, state, animSec);
 
     if (selection.consumeChanged()) bottom.update();
     hudTimer += dtMs;
