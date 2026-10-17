@@ -51,7 +51,7 @@ export function generateWorld(seed: string): World {
   const addNode = (kind: ResourceNodeKind, tx: number, ty: number, amount: number) => {
     if (!inBounds(world, tx, ty) || occupied.has(key(tx, ty))) return false;
     occupied.add(key(tx, ty));
-    world.resourceNodes.push({ id: nextId++, kind, tx, ty, amount, variant: rng.next() });
+    world.resourceNodes.push({ id: nextId++, kind, tx, ty, amount, variant: Math.round(rng.next() * 1000) / 1000 });
     return true;
   };
 

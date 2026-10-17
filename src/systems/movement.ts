@@ -16,8 +16,13 @@ export function clearPath(u: Unit): void {
   u.moving = false;
 }
 
+export interface MoveOptions {
+  maxExpand?: number; // limite de tiles explorados pela busca (destinos inalcançáveis param mais cedo)
+  repathTicks?: number; // intervalo mínimo entre recálculos (alvos que se movem, como titãs)
+}
+
 // Move a unidade em direção ao destino, calculando (ou recalculando) o caminho quando preciso.
-export function moveTo(sim: Sim, u: Unit, goal: Goal): MoveResult {
+export function moveTo(sim: Sim, u: Unit, goal: Goal, opts: MoveOptions = {}): MoveResult {
   const ts = sim.tileSize;
   const { tx, ty } = unitTile(sim, u);
   const key = goalKey(goal);
@@ -28,10 +33,20 @@ export function moveTo(sim: Sim, u: Unit, goal: Goal): MoveResult {
   }
 
   if (u.pathKey !== key) {
-    const res = findPath(sim.nav, tx, ty, goal);
-    u.path = smoothPath(sim.nav, u.x / ts, u.y / ts, res.tiles);
-    u.pathKey = key;
-    u.pathComplete = res.complete;
+    const last = sim.lastRepath.get(u.id) ?? -Infinity;
+    if (opts.repathTicks && sim.state.tick - last < opts.repathTicks) {
+      // Recalculou há pouco: segue o caminho antigo (ou espera) em vez de buscar de novo.
+      if (u.path.length === 0) {
+        u.moving = false;
+        return 'moving';
+      }
+    } else {
+      const res = findPath(sim.nav, tx, ty, goal, opts.maxExpand);
+      u.path = smoothPath(sim.nav, u.x / ts, u.y / ts, res.tiles);
+      u.pathKey = key;
+      u.pathComplete = res.complete;
+      sim.lastRepath.set(u.id, sim.state.tick);
+    }
   }
 
   if (u.path.length === 0) {
@@ -40,7 +55,9 @@ export function moveTo(sim: Sim, u: Unit, goal: Goal): MoveResult {
       const cx = (goal.x0 + 0.5) * ts;
       const cy = (goal.y0 + 0.5) * ts;
       if (stepToward(u, cx, cy)) {
-        clearPath(u);
+        // Mantém a chave do caminho: parado no destino, não precisa buscar de novo a cada passo.
+        u.path = [];
+        u.moving = false;
         return 'arrived';
       }
       return 'moving';

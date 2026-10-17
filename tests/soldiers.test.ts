@@ -265,3 +265,44 @@ describe('liderança do comandante', () => {
     expect(m.hp).toBeCloseTo(unitMaxHp(s, m), 0);
   });
 });
+
+describe('regressões', () => {
+  it('subir de nível num batalhão não cura em dobro', () => {
+    const s = flatGame();
+    const sim = new Sim(s);
+    const c = soldier(s, CENTER + 5, CENTER + 5, 30);
+    const m = soldier(s, CENTER + 6, CENTER + 5, 1);
+    formBattalion(sim, [c.id, m.id]);
+    runSeconds(sim, 0.2);
+    m.hp = unitMaxHp(s, m) / 2;
+    const before = { hp: m.hp, max: unitMaxHp(s, m) };
+    gainXp(sim, m, xpToNext(1));
+    runSeconds(sim, 0.2);
+    expect(m.hp).toBeCloseTo(before.hp + (unitMaxHp(s, m) - before.max), 5);
+  });
+
+  it('soldados atacando um titã no meio da floresta não travam o jogo e esperam perto', async () => {
+    const { addNode } = await import('./helpers');
+    const s = flatGame();
+    setNoon(s);
+    s.buildings = [];
+    // Bloco de floresta 9x9 com o titã no meio.
+    for (let y = -4; y <= 4; y++) for (let x = -4; x <= 4; x++) if (x || y) addNode(s, 'tree', CENTER + 30 + x, CENTER + y);
+    const t = addTitan(s, CENTER + 30, CENTER, 5);
+    t.attackCooldown = 999;
+    const ms = Array.from({ length: 30 }, (_, i) => soldier(s, CENTER + (i % 6), CENTER + 6 + Math.floor(i / 6)));
+    const sim = new Sim(s);
+    // O titã fica parado (sem alvo ao alcance não se aproxima neste teste).
+    t.targetKind = 'none';
+    t.retargetTick = 1e9;
+    commandAttack(sim, ms.map((m) => m.id), t.id);
+    const t0 = performance.now();
+    runSeconds(sim, 20);
+    const msPerTick = (performance.now() - t0) / (20 * 20);
+    expect(msPerTick).toBeLessThan(5);
+    // Continuam com a ordem de ataque e chegaram perto da floresta.
+    expect(ms.every((m) => m.order.type === 'attack')).toBe(true);
+    const near = ms.filter((m) => Math.hypot(m.x / TS - (CENTER + 30), m.y / TS - CENTER) < 10).length;
+    expect(near).toBeGreaterThan(20);
+  });
+});

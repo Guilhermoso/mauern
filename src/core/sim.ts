@@ -33,6 +33,8 @@ export class Sim {
   terrainChanges: { tx: number; ty: number }[] = [];
   fx: Fx[] = [];
   alerts: Alert[] = [];
+  // Último tick em que cada unidade recalculou o caminho (para limitar recálculos caros; não é salvo).
+  lastRepath = new Map<number, number>();
 
   constructor(readonly state: GameState) {
     this.nav = new NavGrid(state.world);
@@ -77,12 +79,43 @@ export class Sim {
 
   // --- Edifícios, unidades e titãs ---
 
+  // Índices por id para buscas rápidas. São reconstruídos quando a lista muda de tamanho
+  // (nasceu, morreu, construiu, destruiu); um id que não está no índice cai na busca linear.
+  private unitIndex = new Map<number, Unit>();
+  private unitIndexOf: Unit[] | null = null;
+  private unitIndexLen = -1;
+  private buildingIndex = new Map<number, Building>();
+  private buildingIndexOf: Building[] | null = null;
+  private buildingIndexLen = -1;
+
   building(id: number): Building | undefined {
-    return this.state.buildings.find((b) => b.id === id);
+    const list = this.state.buildings;
+    if (list !== this.buildingIndexOf || list.length !== this.buildingIndexLen) {
+      this.buildingIndex = new Map(list.map((b) => [b.id, b]));
+      this.buildingIndexOf = list;
+      this.buildingIndexLen = list.length;
+    }
+    let b = this.buildingIndex.get(id);
+    if (!b) {
+      b = list.find((x) => x.id === id);
+      if (b) this.buildingIndex.set(id, b);
+    }
+    return b;
   }
 
   unit(id: number): Unit | undefined {
-    return this.state.units.find((u) => u.id === id);
+    const list = this.state.units;
+    if (list !== this.unitIndexOf || list.length !== this.unitIndexLen) {
+      this.unitIndex = new Map(list.map((u) => [u.id, u]));
+      this.unitIndexOf = list;
+      this.unitIndexLen = list.length;
+    }
+    let u = this.unitIndex.get(id);
+    if (!u) {
+      u = list.find((x) => x.id === id);
+      if (u) this.unitIndex.set(id, u);
+    }
+    return u;
   }
 
   titan(id: number): Titan | undefined {
@@ -97,6 +130,7 @@ export class Sim {
   }
 
   releaseBuilding(b: Building): void {
+    this.buildingIndex.delete(b.id);
     const def = BUILDING_DEFS[b.kind];
     if (!def.walkable && !def.gate) this.nav.release(b.tx, b.ty, def.size, def.size);
     this.fillGrid(b, 0);

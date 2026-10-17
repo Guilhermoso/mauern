@@ -107,7 +107,10 @@ export class SelectionController {
     const bats = new Set(sel.battalions ?? []);
     for (const id of sel.units ?? []) {
       const u = this.sim.unit(id);
-      if (u?.battalion) bats.add(u.battalion);
+      // Quem está dentro de um edifício não pode receber ordens: fica fora da seleção
+      // (ex.: grupos de controle com aldeões que depois se abrigaram).
+      if (!u || u.garrison) continue;
+      if (u.battalion) bats.add(u.battalion);
       else loose.push(id);
     }
     this.selection = { units: loose, battalions: [...bats], building: sel.building ?? null, node: sel.node ?? null, titan: sel.titan ?? null };
@@ -135,7 +138,7 @@ export class SelectionController {
   // Remove da seleção o que deixou de existir.
   prune(): void {
     const s = this.selection;
-    const units = s.units.filter((id) => this.sim.unit(id));
+    const units = s.units.filter((id) => this.sim.unit(id) && !this.sim.unit(id)!.garrison);
     const building = s.building !== null && this.sim.building(s.building) ? s.building : null;
     const node = s.node !== null && this.sim.node(s.node) ? s.node : null;
     const titan = s.titan !== null && this.sim.titan(s.titan) ? s.titan : null;

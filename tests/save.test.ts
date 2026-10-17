@@ -77,3 +77,14 @@ describe('migrações', () => {
     for (let i = 0; i < 100; i++) step(sim);
   });
 });
+
+describe('formato compacto', () => {
+  it('grava os recursos do mapa compactados e lê saves antigos no formato completo', () => {
+    const s = createNewGame('compacto');
+    const json = serialize(s);
+    const plain = JSON.stringify({ ...JSON.parse(json), world: { ...JSON.parse(json).world, resourceNodes: s.world.resourceNodes } });
+    expect(json.length).toBeLessThan(plain.length * 0.6);
+    expect(deserialize(plain).world.resourceNodes).toEqual(s.world.resourceNodes);
+    expect(deserialize(json).world.resourceNodes).toEqual(s.world.resourceNodes);
+  });
+});

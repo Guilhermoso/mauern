@@ -76,10 +76,47 @@ export function updateAttack(sim: Sim, u: Unit, o: AttackOrder): boolean {
       return true;
     }
   }
+  // Qualquer tile livre ao alcance do golpe serve (titãs andam por florestas, onde o tile vizinho
+  // costuma estar ocupado por árvores). A busca é limitada e recalculada no máximo a cada 1 s.
   const tx = Math.floor(t.x / ts);
   const ty = Math.floor(t.y / ts);
-  if (moveTo(sim, u, { x0: tx, y0: ty, x1: tx, y1: ty, adjacent: true }) === 'unreachable') return false;
+  const r = Math.max(1, Math.floor(reach / ts));
+  let goal = { x0: tx - r, y0: ty - r, x1: tx + r, y1: ty + r, adjacent: false };
+  // Titã num lugar que a unidade não alcança (ex.: no meio da floresta): vai até o tile alcançável
+  // mais perto dele e espera lá.
+  const region = sim.nav.regionAt(Math.floor(u.x / ts), Math.floor(u.y / ts));
+  if (region && !regionHasTile(sim, goal, region)) {
+    const near = nearestTileInRegion(sim, tx, ty, region, 8);
+    if (near) goal = { x0: near.x, y0: near.y, x1: near.x, y1: near.y, adjacent: false };
+  }
+  const res = moveTo(sim, u, goal, { maxExpand: 12000, repathTicks: TPS });
+  // Inalcançável por enquanto: espera no ponto mais próximo (o titã costuma vir até os humanos).
+  if (res === 'unreachable') u.moving = false;
   return true;
+}
+
+function regionHasTile(sim: Sim, g: { x0: number; y0: number; x1: number; y1: number }, region: number): boolean {
+  for (let y = g.y0; y <= g.y1; y++) for (let x = g.x0; x <= g.x1; x++) if (sim.nav.regionAt(x, y) === region) return true;
+  return false;
+}
+
+function nearestTileInRegion(sim: Sim, cx: number, cy: number, region: number, radius: number): { x: number; y: number } | null {
+  for (let r = 1; r <= radius; r++) {
+    let best: { x: number; y: number } | null = null;
+    let bestD = Infinity;
+    for (let y = cy - r; y <= cy + r; y++) {
+      for (let x = cx - r; x <= cx + r; x++) {
+        if (Math.max(Math.abs(x - cx), Math.abs(y - cy)) !== r || sim.nav.regionAt(x, y) !== region) continue;
+        const d = (x - cx) ** 2 + (y - cy) ** 2;
+        if (d < bestD) {
+          bestD = d;
+          best = { x, y };
+        }
+      }
+    }
+    if (best) return best;
+  }
+  return null;
 }
 
 // Unidades militares paradas atacam titãs que chegam perto.

@@ -8,7 +8,7 @@ import { titanAt } from './commands';
 import { isSoldier } from './soldiers';
 import { nearestTitan } from './combat';
 import { freeBeds, nearestHospitalWithBeds } from './hospital';
-import { unitMaxHp } from './modifiers';
+import { leadershipBonus, unitMaxHp } from './modifiers';
 import { BUILDING_DEFS } from '../data/defs';
 
 const S = BALANCE.soldiers;
@@ -212,22 +212,22 @@ function pickPatrolPoint(sim: Sim): { tx: number; ty: number } | null {
   return null;
 }
 
-// Vida máxima de cada soldado no último passo: quando o bônus de comando muda (entrou ou saiu do
-// alcance do comandante), a vida atual é ajustada na mesma proporção.
-const lastMaxHp = new WeakMap<Sim, Map<number, number>>();
+// Bônus de comando de cada soldado no último passo: quando ele muda (entrou ou saiu do alcance
+// do comandante, ou o comandante subiu de nível), a vida atual é ajustada na mesma proporção.
+// Só o bônus de comando entra aqui — subir de nível e pesquisas já ajustam a vida por conta própria.
+const lastLeadership = new WeakMap<Sim, Map<number, number>>();
 
 function syncLeadershipHp(sim: Sim): void {
-  let map = lastMaxHp.get(sim);
-  if (!map) lastMaxHp.set(sim, (map = new Map()));
+  let map = lastLeadership.get(sim);
+  if (!map) lastLeadership.set(sim, (map = new Map()));
   const seen = new Set<number>();
   for (const u of sim.state.units) {
     if (!UNIT_DEFS[u.kind].military) continue;
     seen.add(u.id);
-    const max = unitMaxHp(sim.state, u);
+    const bonus = leadershipBonus(sim.state, u);
     const prev = map.get(u.id);
-    if (prev !== undefined && prev !== max && prev > 0) u.hp = Math.min(max, u.hp * (max / prev));
-    else if (u.hp > max) u.hp = max;
-    map.set(u.id, max);
+    if (prev !== undefined && prev !== bonus) u.hp = Math.min(unitMaxHp(sim.state, u), u.hp * ((1 + bonus) / (1 + prev)));
+    map.set(u.id, bonus);
   }
   for (const id of map.keys()) if (!seen.has(id)) map.delete(id);
 }

@@ -38,6 +38,17 @@ export function satisfies(nav: NavGrid, g: Goal, x: number, y: number, cost?: Co
   return x >= g.x0 && x <= g.x1 && y >= g.y0 && y <= g.y1 && free;
 }
 
+// Algum tile que satisfaz o destino pertence a esta região?
+function goalInRegion(nav: NavGrid, g: Goal, region: number): boolean {
+  const pad = g.adjacent ? 1 : 0;
+  for (let y = g.y0 - pad; y <= g.y1 + pad; y++) {
+    for (let x = g.x0 - pad; x <= g.x1 + pad; x++) {
+      if (nav.regionAt(x, y) === region && satisfies(nav, g, x, y)) return true;
+    }
+  }
+  return false;
+}
+
 function heuristic(g: Goal, x: number, y: number): number {
   const dx = Math.max(g.x0 - x, 0, x - g.x1);
   const dy = Math.max(g.y0 - y, 0, y - g.y1);
@@ -84,6 +95,13 @@ export function findPath(nav: NavGrid, sx: number, sy: number, goal: Goal, maxEx
     search = 1;
   }
   if (satisfies(nav, goal, sx, sy, cost)) return { tiles: [], complete: true };
+
+  // Humanos: se nenhum tile do destino está na mesma região da unidade, não há caminho.
+  // Em vez de explorar o mapa inteiro para descobrir isso, faz só uma busca curta para chegar perto.
+  if (!cost) {
+    const region = nav.regionAt(sx, sy);
+    if (region && !goalInRegion(nav, goal, region)) maxExpand = Math.min(maxExpand, 1500);
+  }
 
   const start = sy * w + sx;
   let heapLen = 0;
