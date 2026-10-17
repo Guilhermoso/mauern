@@ -28,7 +28,12 @@ export const BALANCE = {
     crystalAmount: 250,
   },
   population: {
-    townCenterHousing: 5,
+    max: 300,
+  },
+  units: {
+    nodeSearchRadius: 12, // raio (tiles) para achar outro recurso igual quando um acaba
+    autoTaskRadius: 10, // raio para tarefas automáticas após construir
+    maxTrainQueue: 10,
   },
   camera: {
     minZoom: 0.35,

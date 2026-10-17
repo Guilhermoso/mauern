@@ -2,11 +2,11 @@ import { BALANCE } from './data/balance';
 import { Rng, hashString } from './core/rng';
 import { generateWorld } from './world/generate';
 import type { World } from './world/world';
-import type { Building, Resources, Unit } from './entities/types';
-import { BUILDING_DEFS, UNIT_DEFS } from './entities/defs';
+import type { Building, BuildingKind, Resources, Unit, UnitKind } from './entities/types';
+import { BUILDING_DEFS, UNIT_DEFS } from './data/defs';
 import { randomName } from './entities/names';
 
-export const SAVE_VERSION = 1;
+export const SAVE_VERSION = 2;
 
 export interface LogEntry {
   tick: number;
@@ -46,35 +46,17 @@ export function createNewGame(seed: string): GameState {
   // IDs de entidades começam depois dos IDs dos recursos do mapa.
   let nextId = world.resourceNodes.reduce((m, n) => Math.max(m, n.id), 0) + 1;
 
-  const buildings: Building[] = [
-    { id: nextId++, kind: 'townCenter', tx: tcX, ty: tcY, hp: BUILDING_DEFS.townCenter.maxHp },
-  ];
+  const buildings: Building[] = [newBuilding(nextId++, 'townCenter', tcX, tcY, true)];
 
   const units: Unit[] = [];
   const centerX = (world.width / 2) * ts;
   const centerY = (world.height / 2) * ts;
   for (let i = 0; i < BALANCE.start.villagers; i++) {
     const a = (i / BALANCE.start.villagers) * Math.PI + Math.PI * 0.25;
-    units.push({
-      id: nextId++,
-      kind: 'villager',
-      name: randomName(rng),
-      x: centerX + Math.cos(a) * ts * 3.2,
-      y: centerY + Math.sin(a) * ts * 3.2,
-      hp: UNIT_DEFS.villager.maxHp,
-      facing: a,
-    });
+    units.push(newUnit(nextId++, 'villager', randomName(rng), centerX + Math.cos(a) * ts * 3.2, centerY + Math.sin(a) * ts * 3.2));
   }
   for (let i = 0; i < BALANCE.start.scouts; i++) {
-    units.push({
-      id: nextId++,
-      kind: 'scout',
-      name: randomName(rng),
-      x: centerX - ts * 3.5,
-      y: centerY - ts * 2.5,
-      hp: UNIT_DEFS.scout.maxHp,
-      facing: Math.PI,
-    });
+    units.push(newUnit(nextId++, 'scout', randomName(rng), centerX - ts * 3.5, centerY - ts * 2.5));
   }
 
   return {
@@ -94,8 +76,37 @@ export function createNewGame(seed: string): GameState {
   };
 }
 
+export function newBuilding(id: number, kind: BuildingKind, tx: number, ty: number, built: boolean): Building {
+  const def = BUILDING_DEFS[kind];
+  return {
+    id, kind, tx, ty,
+    hp: built ? def.maxHp : 1,
+    built,
+    progress: built ? def.buildTime : 0,
+    queue: [],
+    rally: null,
+    farmerId: 0,
+  };
+}
+
+export function newUnit(id: number, kind: UnitKind, name: string, x: number, y: number): Unit {
+  return {
+    id, kind, name, x, y,
+    hp: UNIT_DEFS[kind].maxHp,
+    facing: Math.PI / 2,
+    order: { type: 'idle' },
+    path: [],
+    pathKey: '',
+    pathComplete: true,
+    carry: null,
+    work: 0,
+    moving: false,
+  };
+}
+
 export function populationCap(state: GameState): number {
-  return state.buildings.reduce((sum, b) => sum + BUILDING_DEFS[b.kind].housing, 0);
+  const cap = state.buildings.reduce((sum, b) => sum + (b.built ? BUILDING_DEFS[b.kind].housing : 0), 0);
+  return Math.min(cap, BALANCE.population.max);
 }
 
 export function addLog(state: GameState, text: string): void {

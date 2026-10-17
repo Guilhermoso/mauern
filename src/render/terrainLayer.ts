@@ -47,9 +47,15 @@ export class TerrainLayer {
     }
   }
 
-  markDirtyAt(tx: number, ty: number): void {
+  // Redesenha os blocos onde o terreno ou os recursos mudaram.
+  markDirty(tiles: { tx: number; ty: number }[]): void {
+    if (!tiles.length) return;
     this.indexNodes();
-    this.dropChunk(Math.floor(ty / CHUNK) * this.cols + Math.floor(tx / CHUNK));
+    const chunks = new Set<number>();
+    for (const { tx, ty } of tiles) {
+      chunks.add(Math.floor(ty / CHUNK) * this.cols + Math.floor(tx / CHUNK));
+    }
+    for (const c of chunks) this.dropChunk(c);
   }
 
   private dropChunk(index: number): void {

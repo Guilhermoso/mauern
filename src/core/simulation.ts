@@ -1,12 +1,19 @@
-import type { GameState } from '../state';
+import type { Sim } from './sim';
 import { addLog } from '../state';
 import { getClock } from './time';
+import { updateUnits } from '../systems/units';
+import { updateProduction } from '../systems/production';
 
 // Um passo fixo da simulação. Não depende da renderização.
-export function step(state: GameState): void {
+export function step(sim: Sim): void {
+  const state = sim.state;
   const before = getClock(state.tick);
   state.tick++;
   const after = getClock(state.tick);
+
+  updateProduction(sim);
+  updateUnits(sim);
+  sim.syncRng();
 
   if (after.day !== before.day) {
     const seasonChanged = after.seasonIndex !== before.seasonIndex;

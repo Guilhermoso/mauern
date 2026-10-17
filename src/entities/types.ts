@@ -15,7 +15,18 @@ export interface ResourceNode {
   variant: number; // variação visual estável
 }
 
-export type BuildingKind = 'townCenter';
+export type BuildingKind = 'townCenter' | 'house' | 'lumberCamp' | 'miningCamp' | 'mill' | 'farm';
+
+export interface TrainItem {
+  kind: UnitKind;
+  progress: number; // segundos já treinados
+}
+
+export interface RallyPoint {
+  tx: number;
+  ty: number;
+  nodeId?: number; // se o ponto de reunião for um recurso, os aldeões vão coletá-lo
+}
 
 export interface Building {
   id: number;
@@ -23,9 +34,30 @@ export interface Building {
   tx: number; // canto superior esquerdo, em tiles
   ty: number;
   hp: number;
+  built: boolean;
+  progress: number; // segundos de construção já feitos
+  queue: TrainItem[];
+  rally: RallyPoint | null;
+  farmerId: number; // fazendas: aldeão que trabalha nela (0 = nenhum)
 }
 
 export type UnitKind = 'villager' | 'scout';
+
+export interface Carry {
+  kind: ResourceKind;
+  amount: number;
+}
+
+export type GatherPhase = 'collect' | 'drop';
+
+export type UnitOrder =
+  | { type: 'idle' }
+  | { type: 'move'; tx: number; ty: number }
+  // tx/ty: última posição conhecida do recurso, para procurar outro igual por perto quando ele acabar
+  | { type: 'gather'; nodeId: number; nodeKind: ResourceNodeKind; tx: number; ty: number; phase: GatherPhase; avoid: number[] }
+  | { type: 'farm'; buildingId: number; phase: GatherPhase }
+  | { type: 'build'; buildingId: number }
+  | { type: 'deliver'; buildingId: number };
 
 export interface Unit {
   id: number;
@@ -35,4 +67,11 @@ export interface Unit {
   y: number;
   hp: number;
   facing: number; // ângulo em radianos
+  order: UnitOrder;
+  path: number[]; // waypoints (índices de tile) ainda a percorrer
+  pathKey: string; // destino para o qual o caminho foi calculado
+  pathComplete: boolean; // false se o caminho só chega perto do destino
+  carry: Carry | null;
+  work: number; // acumulador de trabalho (coleta)
+  moving: boolean;
 }

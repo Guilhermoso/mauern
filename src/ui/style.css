@@ -53,10 +53,15 @@ button.danger:hover { background: #73302a; }
   right: 8px;
   display: flex;
   align-items: center;
-  gap: 18px;
+  gap: 14px;
   padding: 6px 12px;
   font-size: 14px;
-  flex-wrap: wrap;
+  white-space: nowrap;
+}
+.topbar .idle-btn { padding: 2px 8px; }
+/* Em telas menores, os nomes dos recursos somem (continuam no tooltip). */
+@media (max-width: 1500px) {
+  .res .label { display: none; }
 }
 .res { display: flex; align-items: center; gap: 6px; white-space: nowrap; }
 .res .chip { width: 12px; height: 12px; border-radius: 3px; display: inline-block; }
@@ -134,3 +139,54 @@ button.danger:hover { background: #73302a; }
 .debug .btns { display: flex; flex-wrap: wrap; gap: 4px; }
 .debug button { padding: 2px 6px; font-size: 12px; }
 .hidden { display: none !important; }
+
+/* Painel inferior */
+.bottom {
+  position: absolute;
+  left: 236px;
+  right: 380px;
+  bottom: 8px;
+  min-height: 150px;
+  max-height: 210px;
+  display: flex;
+  gap: 14px;
+  padding: 10px 12px;
+  font-size: 13px;
+}
+.bp-info { width: 240px; flex-shrink: 0; display: flex; flex-direction: column; gap: 3px; overflow: hidden; }
+.bp-title { font-size: 16px; font-weight: 600; color: var(--accent); }
+.bp-sub { color: var(--muted); }
+.bp-line.warn { color: #ff8a6a; }
+.bp-hint { color: var(--muted); font-size: 12px; font-style: italic; margin-top: 4px; }
+.bp-bar { height: 6px; background: rgba(0, 0, 0, 0.5); border-radius: 3px; overflow: hidden; margin: 2px 0; }
+.bp-bar-fill { height: 100%; width: 0; background: var(--accent); }
+.bp-queue { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 4px; }
+.bp-qitem { width: 34px; height: 34px; padding: 0; position: relative; font-weight: 600; display: flex; flex-direction: column; justify-content: center; align-items: center; }
+.bp-qitem .bp-bar { position: absolute; left: 2px; right: 2px; bottom: 2px; height: 4px; margin: 0; }
+.bp-commands { display: flex; flex-wrap: wrap; align-content: flex-start; gap: 6px; overflow-y: auto; }
+.cmd {
+  position: relative;
+  width: 112px;
+  height: 52px;
+  padding: 4px 6px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  text-align: left;
+  font-size: 12px;
+  line-height: 1.25;
+}
+.cmd .cmd-label { font-weight: 600; }
+.cmd .cmd-cost { color: var(--muted); font-size: 11px; }
+.cmd .cmd-key {
+  position: absolute;
+  top: 3px;
+  right: 4px;
+  font-size: 10px;
+  color: var(--accent);
+  border: 1px solid var(--panel-border);
+  border-radius: 3px;
+  padding: 0 3px;
+}
+.cmd.disabled { opacity: 0.45; }
+.idle-btn.has-idle { background: #6b4a1e; border-color: var(--accent); }

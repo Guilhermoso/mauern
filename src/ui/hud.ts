@@ -6,6 +6,7 @@ import type { ResourceKind } from '../entities/types';
 export interface HudActions {
   setSpeed(speed: number): void;
   openMenu(): void;
+  selectIdle(): void;
 }
 
 const RESOURCES: { key: ResourceKind; label: string; color: string }[] = [
@@ -23,6 +24,7 @@ export class Hud {
   readonly toasts = document.createElement('div');
   private resEls = new Map<ResourceKind, HTMLElement>();
   private popEl!: HTMLElement;
+  private idleBtn = document.createElement('button');
   private seasonEl!: HTMLElement;
   private clockEl!: HTMLElement;
   private speedBtns: HTMLButtonElement[] = [];
@@ -46,6 +48,11 @@ export class Hud {
     pop.innerHTML = `<span class="chip" style="background:#3a6fd8"></span><span class="label">População</span><b>0</b>`;
     this.popEl = pop.querySelector('b')!;
     this.topbar.appendChild(pop);
+
+    this.idleBtn.className = 'idle-btn';
+    this.idleBtn.title = 'Selecionar o próximo aldeão ocioso (tecla .)';
+    this.idleBtn.onclick = () => this.actions.selectIdle();
+    this.topbar.appendChild(this.idleBtn);
 
     const spacer = document.createElement('div');
     spacer.className = 'spacer';
@@ -85,6 +92,9 @@ export class Hud {
   update(state: GameState): void {
     for (const r of RESOURCES) this.resEls.get(r.key)!.textContent = String(Math.floor(state.resources[r.key]));
     this.popEl.textContent = `${state.units.length}/${populationCap(state)}`;
+    const idle = state.units.filter((u) => u.kind === 'villager' && u.order.type === 'idle').length;
+    this.idleBtn.textContent = `Ociosos: ${idle}`;
+    this.idleBtn.classList.toggle('has-idle', idle > 0);
     const clock = getClock(state.tick);
     this.seasonEl.textContent = `${clock.season}, ano ${clock.year}`;
     this.clockEl.textContent = `Dia ${clock.day} · ${formatClock(clock)}`;

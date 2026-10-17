@@ -4,6 +4,7 @@ import { BALANCE } from './data/balance';
 import { hashString, randomSeed } from './core/rng';
 import { FixedLoop } from './core/loop';
 import { step } from './core/simulation';
+import { Sim } from './core/sim';
 import { getClock } from './core/time';
 import { createNewGame, type GameState } from './state';
 import { clearSaves, exportSave, importSaveFile, loadLatest, saveGame } from './save/storage';
@@ -11,11 +12,14 @@ import { Camera } from './render/camera';
 import { TerrainLayer } from './render/terrainLayer';
 import { EntityLayer } from './render/entityLayer';
 import { Lighting } from './render/lighting';
+import { OverlayLayer } from './render/overlayLayer';
 import { CameraInput, isTyping } from './input/cameraInput';
 import { Hud } from './ui/hud';
 import { Minimap } from './ui/minimap';
 import { Menu } from './ui/menu';
 import { DebugPanel } from './ui/debug';
+import { BottomPanel } from './ui/bottomPanel';
+import { SelectionController } from './input/selection';
 
 const EDGE_PAN_KEY = 'mauern.edgePan';
 
@@ -37,14 +41,16 @@ async function boot(): Promise<void> {
   await app.init({ resizeTo: window, background: '#1a2a3a', antialias: true });
   document.getElementById('game')!.appendChild(app.canvas);
 
+  const sim = new Sim(state);
   const camera = new Camera(state.camera, app.screen.width, app.screen.height);
   camera.clamp();
   const world = new Container();
   const terrain = new TerrainLayer(state.world, hashString(state.seed), app.renderer);
   const entities = new EntityLayer();
-  world.addChild(terrain.container, entities.container);
+  const overlay = new OverlayLayer();
+  world.addChild(terrain.container, overlay.under, entities.container, overlay.over);
   const lighting = new Lighting();
-  app.stage.addChild(world, lighting.overlay);
+  app.stage.addChild(world, lighting.overlay, overlay.screen);
 
   const input = new CameraInput(camera, app.canvas);
   try {
@@ -91,7 +97,9 @@ async function boot(): Promise<void> {
   const togglePause = () => setSpeed(state.speed === 0 ? speedBeforePause : 0);
 
   const ui = document.getElementById('ui')!;
-  const hud = new Hud({ setSpeed, openMenu: () => openMenu() });
+  const hud = new Hud({ setSpeed, openMenu: () => openMenu(), selectIdle: () => selection.selectNextIdle() });
+  const selection = new SelectionController(sim, camera, app.canvas, (t) => hud.toast(t));
+  const bottom = new BottomPanel(sim, selection, (t) => hud.toast(t));
   const minimap = new Minimap(state, camera);
   let speedBeforeMenu = state.speed;
   const menu = new Menu({
@@ -129,10 +137,10 @@ async function boot(): Promise<void> {
   const debug = new DebugPanel(state, {
     setSpeed,
     skipTicks: (n) => {
-      for (let i = 0; i < n; i++) step(state);
+      for (let i = 0; i < n; i++) step(sim);
     },
   });
-  ui.append(hud.topbar, minimap.el, hud.log, hud.toasts, debug.el, menu.el);
+  ui.append(hud.topbar, minimap.el, bottom.el, hud.log, hud.toasts, debug.el, menu.el);
   if (loadWarning) hud.toast(loadWarning);
 
   window.addEventListener('keydown', (e) => {
@@ -140,10 +148,11 @@ async function boot(): Promise<void> {
     if (e.code === 'Escape') {
       e.preventDefault();
       if (menu.isOpen) menu.close();
-      else openMenu();
+      else if (!selection.handleKey(e)) openMenu();
       return;
     }
     if (menu.isOpen) return;
+    if (selection.handleKey(e)) return;
     switch (e.code) {
       case 'Space':
         e.preventDefault();
@@ -153,11 +162,6 @@ async function boot(): Promise<void> {
         e.preventDefault();
         debug.toggle();
         break;
-      case 'KeyH': {
-        const tc = state.buildings.find((b) => b.kind === 'townCenter');
-        if (tc) camera.centerOn((tc.tx + 2) * BALANCE.world.tileSize, (tc.ty + 2) * BALANCE.world.tileSize);
-        break;
-      }
       case 'Equal':
       case 'NumpadAdd': {
         const i = BALANCE.speeds.indexOf(state.speed as 0 | 1 | 2 | 3);
@@ -174,7 +178,7 @@ async function boot(): Promise<void> {
   });
 
   // --- Laço principal ---
-  const loop = new FixedLoop(() => step(state));
+  const loop = new FixedLoop(() => step(sim));
   let hudTimer = 0;
   app.ticker.add((ticker) => {
     const dtMs = ticker.deltaMS;
@@ -189,19 +193,33 @@ async function boot(): Promise<void> {
       Math.round(camera.screenH / 2 - camera.state.y * camera.zoom),
     );
 
+    if (sim.terrainChanges.length) {
+      terrain.markDirty(sim.terrainChanges);
+      minimap.markDirty();
+      sim.terrainChanges = [];
+    }
     terrain.update(camera.viewRect());
     entities.sync(state, performance.now() / 1000);
+    overlay.update(sim, selection, camera.zoom);
     lighting.update(getClock(state.tick).dayFraction, camera.screenW, camera.screenH);
 
+    if (selection.consumeChanged()) bottom.update();
     hudTimer += dtMs;
     if (hudTimer > 200) {
       hudTimer = 0;
       hud.update(state);
+      selection.prune();
+      bottom.update();
     }
     minimap.draw();
     debug.update();
   });
   hud.update(state);
+
+  // Acesso para testes automatizados (abrir o jogo com ?debug na URL).
+  if (new URLSearchParams(location.search).has('debug')) {
+    (window as unknown as Record<string, unknown>).mauern = { sim, camera, selection };
+  }
 }
 
 void boot();

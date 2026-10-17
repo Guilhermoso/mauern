@@ -5,7 +5,29 @@ import { SAVE_VERSION, type GameState } from '../state';
 type Migration = (save: any) => any;
 
 const MIGRATIONS: Record<number, Migration> = {
-  // 1: (save) => ({ ...save, novoCampo: valorPadrao, version: 2 }),
+  // v1 → v2: edifícios ganham construção, fila de treino e ponto de reunião; unidades ganham ordens.
+  1: (save) => ({
+    ...save,
+    version: 2,
+    buildings: save.buildings.map((b: any) => ({
+      ...b,
+      built: true,
+      progress: 0,
+      queue: [],
+      rally: null,
+      farmerId: 0,
+    })),
+    units: save.units.map((u: any) => ({
+      ...u,
+      order: { type: 'idle' },
+      path: [],
+      pathKey: '',
+      pathComplete: true,
+      carry: null,
+      work: 0,
+      moving: false,
+    })),
+  }),
 };
 
 export function migrate(save: any): GameState {

@@ -2,7 +2,7 @@ import { BALANCE } from '../data/balance';
 import { TILE_INFO } from '../world/terrain';
 import type { GameState } from '../state';
 import type { Camera } from '../render/camera';
-import { BUILDING_DEFS } from '../entities/defs';
+import { BUILDING_DEFS } from '../data/defs';
 
 // Minimapa clicável: terreno pré-desenhado em um canvas fora da tela,
 // com unidades, edifícios e o retângulo da câmera desenhados por cima.

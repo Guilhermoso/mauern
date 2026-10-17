@@ -2,11 +2,13 @@ import { describe, expect, it } from 'vitest';
 import { createNewGame, SAVE_VERSION } from '../src/state';
 import { deserialize, serialize } from '../src/save/serialize';
 import { step } from '../src/core/simulation';
+import { Sim } from '../src/core/sim';
 
 describe('save', () => {
   it('serializa e restaura o estado completo', () => {
     const s = createNewGame('save');
-    for (let i = 0; i < 5000; i++) step(s);
+    const sim = new Sim(s);
+    for (let i = 0; i < 5000; i++) step(sim);
     s.resources.wood = 321;
     const restored = deserialize(serialize(s));
     expect(restored).toEqual(s);
@@ -33,10 +35,32 @@ describe('save', () => {
 describe('simulação', () => {
   it('registra o amanhecer de um novo dia no diário', () => {
     const s = createNewGame('dia');
+    const sim = new Sim(s);
     const before = s.log.length;
     // A partida começa às 7h; 17h depois já é o dia 2.
-    for (let i = 0; i < 4800; i++) step(s);
+    for (let i = 0; i < 4800; i++) step(sim);
     expect(s.log.length).toBe(before + 1);
     expect(s.log[s.log.length - 1].text).toContain('Dia 2');
+  });
+});
+
+describe('migrações', () => {
+  it('converte um save v1 (etapa 1) para a versão atual', () => {
+    const s = createNewGame('antigo');
+    const v1: any = JSON.parse(serialize(s));
+    v1.version = 1;
+    for (const b of v1.buildings) {
+      delete b.built; delete b.progress; delete b.queue; delete b.rally; delete b.farmerId;
+    }
+    for (const u of v1.units) {
+      delete u.order; delete u.path; delete u.pathKey; delete u.pathComplete; delete u.carry; delete u.work; delete u.moving;
+    }
+    const migrated = deserialize(JSON.stringify(v1));
+    expect(migrated.version).toBe(SAVE_VERSION);
+    expect(migrated.buildings[0].built).toBe(true);
+    expect(migrated.units[0].order).toEqual({ type: 'idle' });
+    // O jogo migrado roda normalmente.
+    const sim = new Sim(migrated);
+    for (let i = 0; i < 100; i++) step(sim);
   });
 });
