@@ -105,6 +105,11 @@ export function updateGarrisonOrder(sim: Sim, u: Unit, o: GarrisonOrder): boolea
   u.y = c.y;
   u.order = { type: 'idle' };
   clearPath(u);
+  // Soldado que entra num Campo de Refúgio sem guarda assume o posto.
+  if (b.kind === 'refuge' && UNIT_DEFS[u.kind].military) {
+    const g = b.guardId ? sim.unit(b.guardId) : undefined;
+    if (!g || g.garrison !== b.id) b.guardId = u.id;
+  }
   return true;
 }
 
@@ -167,7 +172,7 @@ export function stopAlarm(sim: Sim): void {
   const state = sim.state;
   state.alarm = false;
   for (const b of shelters(sim)) {
-    for (const u of ejectGarrison(sim, b, (x) => x.kind === 'villager')) {
+    for (const u of ejectGarrison(sim, b, (x) => x.kind === 'villager' && x.terror <= 0)) {
       if (u.prevOrder) u.order = u.prevOrder;
       u.prevOrder = null;
     }

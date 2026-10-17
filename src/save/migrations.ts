@@ -86,6 +86,17 @@ const MIGRATIONS: Record<number, Migration> = {
     buildings: save.buildings.map((b: any) => ({ ...b, trainerId: 0 })),
     units: save.units.map((u: any) => ({ ...u, level: 1, xp: 0, battalion: 0, speedCap: 0 })),
   }),
+  // v5 → v6: treino em lotes, terror dos aldeões e campo de refúgio.
+  5: (save) => ({
+    ...save,
+    version: 6,
+    buildings: save.buildings.map((b: any) => ({
+      ...b,
+      guardId: 0,
+      queue: b.queue.map((q: any) => ({ ...q, count: q.count ?? 1 })),
+    })),
+    units: save.units.map((u: any) => ({ ...u, terror: 0 })),
+  }),
 };
 
 export function migrate(save: any): GameState {

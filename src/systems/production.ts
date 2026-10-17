@@ -9,16 +9,21 @@ import { unitMaxHp } from './modifiers';
 
 const DT = 1 / BALANCE.time.ticksPerSecond;
 
-// Avança as filas de treino dos edifícios. O treino pausa se não houver moradia.
+// Tempo de um lote: a primeira unidade custa o tempo cheio, cada extra uma fração.
+export function batchTime(kind: Unit['kind'], count: number): number {
+  return UNIT_DEFS[kind].trainTime * (1 + (count - 1) * BALANCE.units.batchExtraTime);
+}
+
+// Avança as filas de treino dos edifícios. Um lote só avança se houver moradia para todo ele.
 export function updateProduction(sim: Sim): void {
   for (const b of sim.state.buildings) {
     if (!b.built || b.queue.length === 0) continue;
     const item = b.queue[0];
-    if (sim.state.units.length >= populationCap(sim.state)) continue;
+    if (sim.state.units.length + item.count > populationCap(sim.state)) continue;
     item.progress += DT;
-    if (item.progress >= UNIT_DEFS[item.kind].trainTime) {
+    if (item.progress >= batchTime(item.kind, item.count)) {
       b.queue.shift();
-      spawnUnit(sim, b, item.kind);
+      for (let i = 0; i < item.count; i++) spawnUnit(sim, b, item.kind);
     }
   }
 }

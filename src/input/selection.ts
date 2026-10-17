@@ -17,7 +17,7 @@ import {
 import { idleVillagers } from '../systems/queries';
 import { battalionCommand, battalionOf, formBattalion } from '../systems/battalions';
 import { ringAlarm, stopAlarm } from '../systems/combat';
-import { ungarrison } from '../systems/commands';
+import { releaseShelter } from '../systems/refuge';
 import { setIdle } from '../systems/units';
 
 export interface Selection {
@@ -450,7 +450,7 @@ export class SelectionController {
       }
     }
     if (s.building !== null && e.code === 'KeyU') {
-      ungarrison(this.sim, s.building);
+      if (releaseShelter(this.sim, s.building, false) === 0) this.toast('Ninguém pode sair agora.');
       return true;
     }
     if (s.building !== null && e.code === 'KeyB' && this.sim.building(s.building)?.kind === 'townCenter') {
@@ -462,9 +462,11 @@ export class SelectionController {
       const b = this.sim.building(s.building);
       const kind = b && BUILDING_DEFS[b.kind].trains.find((k) => UNIT_DEFS[k].hotkey === e.code);
       if (b && kind) {
-        const times = e.shiftKey ? 5 : 1;
+        // Militares: Shift enfileira um lote cheio. Aldeões: Shift enfileira 5, um por vez.
+        const military = UNIT_DEFS[kind].military;
+        const times = e.shiftKey && !military ? 5 : 1;
         for (let i = 0; i < times; i++) {
-          const err = trainUnit(this.sim, b.id, kind);
+          const err = trainUnit(this.sim, b.id, kind, e.shiftKey && military);
           if (err) {
             this.toast(err);
             break;

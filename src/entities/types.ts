@@ -27,10 +27,12 @@ export type BuildingKind =
   | 'watchTower'
   | 'well'
   | 'bonfire'
-  | 'trainingGround';
+  | 'trainingGround'
+  | 'refuge';
 
 export interface TrainItem {
   kind: UnitKind;
+  count: number; // unidades no lote (treinadas juntas)
   progress: number; // segundos já treinados
 }
 
@@ -57,6 +59,7 @@ export interface Building {
   missingHours: number; // casas: horas seguidas sem as necessidades do nível atual
   research: { tech: string; progress: number } | null;
   trainerId: number; // campo de treinamento: soldado que comanda o treino (0 = nenhum)
+  guardId: number; // campo de refúgio: soldado no posto (0 = nenhum)
 }
 
 export type UnitKind = 'villager' | 'scout' | 'militia';
@@ -79,7 +82,8 @@ export type UnitOrder =
   | { type: 'attack'; titanId: number }
   | { type: 'garrison'; buildingId: number }
   | { type: 'train'; buildingId: number }
-  | { type: 'follow' }; // membro de batalhão seguindo o comandante em formação
+  | { type: 'follow' } // membro de batalhão seguindo o comandante em formação
+  | { type: 'flee'; buildingId: number; tx: number; ty: number }; // fugindo de um titã (para um abrigo ou para longe)
 
 export interface Unit {
   id: number;
@@ -103,6 +107,7 @@ export interface Unit {
   xp: number; // experiência acumulada no nível atual
   battalion: number; // batalhão ao qual pertence (0 = avulso)
   speedCap: number; // velocidade máxima imposta pelo batalhão (0 = sem limite)
+  terror: number; // segundos de terror restantes (aldeões que fugiram de um titã)
 }
 
 export type BattalionMode = 'manual' | 'defend' | 'hunt';

@@ -1,9 +1,12 @@
 import { BUILDING_DEFS, NODE_DEFS, RESOURCE_NAMES, UNIT_DEFS, VILLAGER_BUILDS, formatCost, unitNoun } from '../data/defs';
 import { isFemaleName } from '../entities/names';
+import { iconImg } from './icons';
+import { batchTime } from '../systems/production';
 import type { Sim } from '../core/sim';
 import type { SelectionController } from '../input/selection';
 import { populationCap } from '../state';
-import { canAfford, cancelTrain, trainUnit, ungarrison } from '../systems/commands';
+import { canAfford, cancelTrain, trainUnit } from '../systems/commands';
+import { dismissGuard, guardOf, releaseShelter } from '../systems/refuge';
 import { unitStatus } from '../systems/units';
 import { garrisonCount } from '../systems/damage';
 import { ringAlarm, stopAlarm } from '../systems/combat';
@@ -60,7 +63,7 @@ export class BottomPanel {
     if (s.building !== null) {
       const b = this.sim.building(s.building);
       return b
-        ? `b:${b.id}:${b.built}:${b.queue.length}:${garrisonCount(this.sim, b) > 0}:${this.sim.state.alarm}:${b.research?.tech ?? ''}:${this.sim.state.techs.length}:${b.level}:${b.trainerId}:${b.kind === 'trainingGround' ? trainees(this.sim, b).map((u) => u.id).join(',') : ''}`
+        ? `b:${b.id}:${b.built}:${b.queue.map((q) => q.count).join('.')}:${garrisonCount(this.sim, b) > 0}:${this.sim.state.alarm}:${b.research?.tech ?? ''}:${this.sim.state.techs.length}:${b.level}:${b.trainerId}:${b.guardId}:${b.kind === 'trainingGround' ? trainees(this.sim, b).map((u) => u.id).join(',') : ''}`
         : '';
     }
     if (s.node !== null) return `n:${s.node}`;
@@ -102,7 +105,8 @@ export class BottomPanel {
     const units = ids.map((id) => this.sim.unit(id)).filter((u): u is Unit => !!u);
     if (units.length === 1) {
       const u = units[0];
-      const title = el('div', 'bp-title', u.name);
+      const title = el('div', 'bp-title with-portrait', u.name);
+      title.prepend(iconImg(u.kind, 'portrait'));
       const sub = el('div', 'bp-sub', unitNoun(u.kind, isFemaleName(u.name)));
       const hp = el('div', 'bp-line');
       const status = el('div', 'bp-line');
@@ -117,7 +121,11 @@ export class BottomPanel {
       const counts = new Map<UnitKind, number>();
       for (const u of units) counts.set(u.kind, (counts.get(u.kind) ?? 0) + 1);
       this.info.append(el('div', 'bp-title', `${units.length} unidades`));
-      for (const [kind, n] of counts) this.info.append(el('div', 'bp-line', `${n}× ${UNIT_DEFS[kind].name}`));
+      for (const [kind, n] of counts) {
+        const row = el('div', 'bp-line with-icon-line', `${n}× ${UNIT_DEFS[kind].name}`);
+        row.prepend(iconImg(kind, 'mini-icon'));
+        this.info.append(row);
+      }
     }
 
     this.info.append(el('div', 'bp-hint', 'Clique direito: andar, coletar, construir, reparar, abrigar, treinar ou atacar.'));
@@ -176,14 +184,7 @@ export class BottomPanel {
       this.info.append(el('div', 'bp-line', `Alcance: ${serviceRadius(this.sim, b.kind)} tiles (círculo no mapa)`));
     }
     this.buildResearch(b);
-    if (def.garrison > 0) {
-      const g = el('div', 'bp-line');
-      this.info.append(g);
-      this.updaters.push(() => (g.textContent = `Abrigados: ${garrisonCount(this.sim, b)}/${def.garrison}`));
-      if (garrisonCount(this.sim, b) > 0) {
-        this.commands.appendChild(cmdButton('Liberar abrigados', '', 'U', 'Todos saem do edifício', () => ungarrison(this.sim, b.id)));
-      }
-    }
+    if (def.garrison > 0) this.buildShelter(b);
     if (b.kind === 'townCenter') {
       const alarm = this.sim.state.alarm;
       const bellBtn = cmdButton(
@@ -212,10 +213,24 @@ export class BottomPanel {
     for (const kind of def.trains) {
       const udef = UNIT_DEFS[kind];
       const key = udef.hotkey.replace('Key', '');
-      const btn = cmdButton(`Treinar ${udef.name.toLowerCase()}`, formatCost(udef.cost), key, `${udef.name} (${udef.trainTime}s). Shift+${key} treina 5.`, () => {
-        const err = trainUnit(this.sim, b.id, kind);
-        if (err) this.toast(err);
-      });
+      const batch = udef.military ? BALANCE.units.maxBatch : 1;
+      const tip = udef.military
+        ? `${udef.name} (${udef.trainTime}s). Treina em lotes de até ${batch}: cada clique soma 1 ao lote; Shift+clique (ou Shift+${key}) enfileira um lote cheio.`
+        : `${udef.name} (${udef.trainTime}s). Shift+${key} enfileira 5.`;
+      const btn = cmdButton(`Treinar ${udef.name.toLowerCase()}`, formatCost(udef.cost), key, tip, () => {});
+      btn.onclick = (ev) => {
+        const shift = ev.shiftKey;
+        const times = shift && !udef.military ? 5 : 1;
+        for (let i = 0; i < times; i++) {
+          const err = trainUnit(this.sim, b.id, kind, shift && udef.military);
+          if (err) {
+            this.toast(err);
+            break;
+          }
+        }
+      };
+      btn.classList.add('with-icon');
+      btn.prepend(iconImg(kind, 'cmd-icon'));
       this.commands.appendChild(btn);
       this.updaters.push(() => btn.classList.toggle('disabled', !canAfford(this.sim, udef.cost)));
     }
@@ -223,15 +238,22 @@ export class BottomPanel {
     if (def.trains.length) {
       const queue = el('div', 'bp-queue');
       b.queue.forEach((item, i) => {
+        // Ícone da unidade; no lote em treino, uma "pizza" escura recua no sentido horário.
         const q = document.createElement('button');
         q.className = 'bp-qitem';
-        q.title = 'Clique para cancelar';
-        q.textContent = UNIT_DEFS[item.kind].name[0];
+        q.title = `${item.count}× ${UNIT_DEFS[item.kind].name} — clique para cancelar uma`;
+        q.appendChild(iconImg(item.kind, 'q-icon'));
+        const pie = el('div', 'q-pie');
+        q.appendChild(pie);
+        if (item.count > 1) q.appendChild(el('div', 'q-count', `×${item.count}`));
         q.onclick = () => cancelTrain(this.sim, b.id, i);
         if (i === 0) {
-          const bar = progressBar();
-          q.appendChild(bar.el);
-          this.updaters.push(() => bar.set(item.progress / UNIT_DEFS[item.kind].trainTime));
+          this.updaters.push(() => {
+            const p = Math.min(100, (item.progress / batchTime(item.kind, item.count)) * 100);
+            pie.style.background = `conic-gradient(transparent 0 ${p}%, rgba(0, 0, 0, 0.6) ${p}% 100%)`;
+          });
+        } else {
+          pie.style.background = 'rgba(0, 0, 0, 0.35)';
         }
         queue.appendChild(q);
       });
@@ -240,8 +262,9 @@ export class BottomPanel {
       this.updaters.push(() => {
         const cap = populationCap(this.sim.state);
         const n = this.sim.state.units.length;
-        pop.textContent = n >= cap && b.queue.length ? `População no limite (${n}/${cap}) — construa casas!` : '';
-        pop.classList.toggle('warn', n >= cap);
+        const need = b.queue[0]?.count ?? 0;
+        pop.textContent = need && n + need > cap ? `Sem moradia para o lote (${n}/${cap}) — construa casas!` : '';
+        pop.classList.toggle('warn', !!need && n + need > cap);
       });
       this.info.append(el('div', 'bp-hint', 'Botão direito no mapa define o ponto de reunião.'));
     }
@@ -318,6 +341,45 @@ export class BottomPanel {
     }
     this.info.append(el('div', 'bp-hint', 'Clique direito: todos se movem ou atacam juntos.'));
     this.commands.appendChild(cmdButton('Parar', '', '', 'Interrompe a ordem atual', () => this.sel.stopSelected()));
+  }
+
+  // Abrigos (Centro da Vila, torres, Campo de Refúgio): quem está dentro, terror e como liberar.
+  private buildShelter(b: Building): void {
+    const def = BUILDING_DEFS[b.kind];
+    const line = el('div', 'bp-line');
+    const terror = el('div', 'bp-line warn');
+    this.info.append(line, terror);
+    const inside = () => this.sim.state.units.filter((u) => u.garrison === b.id);
+    this.updaters.push(() => {
+      const list = inside();
+      line.textContent = `Abrigados: ${list.length}/${def.garrison}`;
+      const scared = list.filter((u) => u.terror > 0);
+      const longest = Math.max(0, ...scared.map((u) => u.terror));
+      terror.textContent = scared.length ? `${scared.length} aterrorizado(s) — não saem por mais ${Math.ceil(longest)} s` : '';
+    });
+    if (b.kind === 'refuge') {
+      const guard = el('div', 'bp-line');
+      this.info.append(guard);
+      this.updaters.push(() => {
+        const g = guardOf(this.sim, b);
+        guard.textContent = g
+          ? `Guarda no posto: ${g.name} — ${rankName(g.level)} (terror passa ${Math.round(g.level * BALANCE.refuge.guardBonusPerLevel * 100)}% mais rápido)`
+          : 'Sem guarda: mande um soldado para cá (botão direito) para acalmar os aldeões.';
+      });
+      if (guardOf(this.sim, b)) this.commands.appendChild(cmdButton('Dispensar guarda', '', '', 'O soldado deixa o posto', () => dismissGuard(this.sim, b.id)));
+    }
+    if (garrisonCount(this.sim, b) > 0) {
+      this.commands.appendChild(
+        cmdButton('Sair', 'ficam ociosos', 'U', 'Os abrigados que não estão aterrorizados saem do edifício.', () => {
+          if (releaseShelter(this.sim, b.id, false) === 0) this.toast('Ninguém pode sair agora (aterrorizados ou ninguém dentro).');
+        }),
+      );
+      this.commands.appendChild(
+        cmdButton('Voltar ao trabalho', 'retomam o que faziam', '', 'Os abrigados que não estão aterrorizados saem e voltam ao que faziam antes de fugir.', () => {
+          if (releaseShelter(this.sim, b.id, true) === 0) this.toast('Ninguém pode sair agora (aterrorizados ou ninguém dentro).');
+        }),
+      );
+    }
   }
 
   private buildTrainingGround(b: Building): void {

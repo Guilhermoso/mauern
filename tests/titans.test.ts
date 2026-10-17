@@ -88,10 +88,11 @@ describe('titãs', () => {
     expect(tc.hp).toBeLessThan(BUILDING_DEFS.townCenter.maxHp);
   });
 
-  it('devoram aldeões ao alcance', () => {
+  it('devoram quem fica ao alcance', () => {
     const s = flatGame();
     setNoon(s);
-    const u = addVillager(s, CENTER + 8, CENTER + 8);
+    const u = newUnit(s.nextId++, 'scout', 'Otto Bauer', (CENTER + 8.5) * 32, (CENTER + 8.5) * 32);
+    s.units.push(u);
     addTitan(s, CENTER + 11, CENTER + 8, 5);
     const sim = new Sim(s);
     runSeconds(sim, 20);

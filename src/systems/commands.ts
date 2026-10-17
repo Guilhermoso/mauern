@@ -124,9 +124,10 @@ export function commandGarrison(sim: Sim, ids: readonly number[], buildingId: nu
   return null;
 }
 
+// Libera os abrigados (menos os aterrorizados e o guarda do refúgio), sem retomar o trabalho.
 export function ungarrison(sim: Sim, buildingId: number): void {
   const b = sim.building(buildingId);
-  if (b) for (const u of ejectGarrison(sim, b)) u.prevOrder = null;
+  if (b) for (const u of ejectGarrison(sim, b, (x) => x.terror <= 0 && x.id !== b.guardId)) u.prevOrder = null;
 }
 
 // Titã sob o ponto (em pixels de mundo), se houver.
@@ -291,24 +292,37 @@ export function placeWallLine(
   return placed;
 }
 
-export function trainUnit(sim: Sim, buildingId: number, kind: UnitKind): string | null {
+// Treina uma unidade. Unidades militares entram no último lote do mesmo tipo, mesmo que já tenha
+// começado (o tempo do lote cresce e o progresso feito é mantido), até o tamanho máximo do lote.
+// Com fullBatch, enfileira um lote cheio de uma vez (o que der para pagar).
+export function trainUnit(sim: Sim, buildingId: number, kind: UnitKind, fullBatch = false): string | null {
   const b = sim.building(buildingId);
   if (!b || !b.built) return 'Edifício indisponível.';
   if (!BUILDING_DEFS[b.kind].trains.includes(kind)) return 'Este edifício não treina esta unidade.';
-  if (b.queue.length >= BALANCE.units.maxTrainQueue) return 'A fila de treino está cheia.';
   const cost = UNIT_DEFS[kind].cost;
   if (!canAfford(sim, cost)) return 'Recursos insuficientes.';
-  pay(sim, cost);
-  b.queue.push({ kind, progress: 0 });
+  const maxBatch = UNIT_DEFS[kind].military ? BALANCE.units.maxBatch : 1;
+  const last = b.queue[b.queue.length - 1];
+  const canJoin = !fullBatch && last && last.kind === kind && last.count < maxBatch;
+  if (!canJoin && b.queue.length >= BALANCE.units.maxTrainQueue) return 'A fila de treino está cheia.';
+  const item = canJoin ? last : { kind, count: 0, progress: 0 };
+  if (!canJoin) b.queue.push(item);
+  const want = fullBatch ? maxBatch - item.count : 1;
+  for (let i = 0; i < want && canAfford(sim, cost); i++) {
+    pay(sim, cost);
+    item.count++;
+  }
   return null;
 }
 
+// Cancela uma unidade do lote (o lote some quando fica vazio).
 export function cancelTrain(sim: Sim, buildingId: number, index: number): void {
   const b = sim.building(buildingId);
   const item = b?.queue[index];
   if (!b || !item) return;
-  b.queue.splice(index, 1);
   refund(sim, UNIT_DEFS[item.kind].cost);
+  item.count--;
+  if (item.count <= 0) b.queue.splice(index, 1);
 }
 
 export function setRally(sim: Sim, buildingId: number, tx: number, ty: number): void {

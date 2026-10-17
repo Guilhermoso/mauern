@@ -176,6 +176,22 @@ function drawFinished(kind: BuildingKind, size: number, level = 1): BuildingArt 
       }
       break;
     }
+    case 'refuge': {
+      // Paliçada fechada com um galpão coberto e uma bandeira branca no mastro.
+      shadow(g, size - 8, 8);
+      g.rect(2, 2, size - 4, size - 4).fill(0x8a7a5a);
+      g.rect(2, 2, size - 4, size - 4).stroke({ width: 4, color: 0x6b4a2a });
+      for (let i = 4; i < size - 2; i += 6) {
+        for (const [x, y] of [[i, 2], [i, size - 2], [2, i], [size - 2, i]]) g.circle(x, y, 2.6).fill(0x7a5230);
+      }
+      const roof = 0x5f6b4a;
+      g.rect(12, 14, size - 24, size - 30).fill(shade(roof, 1.1));
+      g.rect(12, 14 + (size - 30) / 2, size - 24, (size - 30) / 2).fill(shade(roof, 0.8));
+      g.rect(size / 2 - 7, size - 18, 14, 10).fill(0x3a2a1a); // entrada
+      g.rect(size - 18, 6, 2, 18).fill(0x3a2e22);
+      g.poly([size - 16, 6, size - 4, 9, size - 16, 12]).fill(0xf2f2ee);
+      break;
+    }
     case 'trainingGround': {
       // Arena de areia cercada, com bonecos de palha e um suporte de armas.
       g.rect(2, 2, size - 4, size - 4).fill(0xc2a874);

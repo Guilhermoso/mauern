@@ -170,7 +170,7 @@ describe('moral', () => {
     setNoon(s);
     const sim = new Sim(s);
     const before = moraleTarget(sim).target;
-    addVillager(s, CENTER + 8, CENTER + 8);
+    s.units.push(newUnit(s.nextId++, 'scout', 'Otto Bauer', (CENTER + 8.5) * 32, (CENTER + 8.5) * 32));
     addTitan(s, CENTER + 10, CENTER + 8, 6);
     runSeconds(sim, 15);
     expect(s.stats.deaths).toBeGreaterThan(0);

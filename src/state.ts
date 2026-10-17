@@ -19,7 +19,7 @@ import type {
 import { BUILDING_DEFS, UNIT_DEFS } from './data/defs';
 import { randomName } from './entities/names';
 
-export const SAVE_VERSION = 5;
+export const SAVE_VERSION = 6;
 
 export interface LogEntry {
   tick: number;
@@ -131,6 +131,7 @@ export function newBuilding(id: number, kind: BuildingKind, tx: number, ty: numb
     missingHours: 0,
     research: null,
     trainerId: 0,
+    guardId: 0,
   };
 }
 
@@ -179,6 +180,7 @@ export function newUnit(id: number, kind: UnitKind, name: string, x: number, y: 
     xp: 0,
     battalion: 0,
     speedCap: 0,
+    terror: 0,
   };
 }
 

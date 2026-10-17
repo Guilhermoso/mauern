@@ -106,6 +106,13 @@ export const BUILDING_DEFS: Record<BuildingKind, BuildingDef> = {
     size: 1, maxHp: 250, housing: 0, cost: { wood: 30, stone: 20 }, buildTime: 15,
     dropsite: [], walkable: false, trains: [], hotkey: 'KeyV', garrison: 0,
   },
+  refuge: {
+    name: 'Campo de Refúgio',
+    feminine: false,
+    description: 'Abrigo para onde os aldeões fogem quando um titã chega perto. Um soldado no posto acalma o terror mais rápido.',
+    size: 3, maxHp: 900, housing: 0, cost: { wood: 120, stone: 30 }, buildTime: 30,
+    dropsite: [], walkable: false, trains: [], hotkey: 'KeyU', garrison: 25,
+  },
   trainingGround: {
     name: 'Campo de Treinamento',
     feminine: false,
@@ -123,7 +130,7 @@ export const BUILDING_DEFS: Record<BuildingKind, BuildingDef> = {
 };
 
 // Ordem dos botões no menu de construção do aldeão.
-export const VILLAGER_BUILDS: BuildingKind[] = ['house', 'well', 'bonfire', 'lumberCamp', 'miningCamp', 'mill', 'farm', 'palisade', 'gate', 'watchTower', 'trainingGround'];
+export const VILLAGER_BUILDS: BuildingKind[] = ['house', 'well', 'bonfire', 'lumberCamp', 'miningCamp', 'mill', 'farm', 'palisade', 'gate', 'watchTower', 'trainingGround', 'refuge'];
 
 export interface UnitDef {
   name: string;

@@ -33,7 +33,15 @@ export const BALANCE = {
   units: {
     nodeSearchRadius: 12, // raio (tiles) para achar outro recurso igual quando um acaba
     autoTaskRadius: 10, // raio para tarefas automáticas após construir
-    maxTrainQueue: 10,
+    maxTrainQueue: 10, // lotes na fila de um edifício
+    maxBatch: 3, // unidades militares treinadas juntas num lote (aldeões: sempre 1)
+    batchExtraTime: 0.8, // cada unidade extra do lote soma 80% do tempo de uma unidade
+  },
+  refuge: {
+    fleeRadius: 7, // tiles: aldeões fogem quando um titã chega a essa distância
+    terrorSeconds: 60, // duração do terror (segundos de jogo na velocidade 1x)
+    guardBonusPerLevel: 0.05, // cada nível do guarda faz o terror passar 5% mais rápido
+    runAwayTiles: 10, // sem abrigo com vaga, o aldeão corre essa distância para longe do titã
   },
   titans: {
     firstSpawnDay: 3, // os primeiros dias são calmos

@@ -168,7 +168,15 @@ function createUnitView(u: Unit): UnitView {
 // o comandante de batalhão leva um estandarte.
 function drawBadge(g: Graphics, u: Unit, commander: boolean): void {
   g.clear();
-  if (u.kind === 'villager') return;
+  if (u.kind === 'villager') {
+    // Aldeão aterrorizado: um "!" vermelho sobre a cabeça.
+    if (u.terror > 0) {
+      g.circle(0, -14, 4.5).fill(0xd93a2b).stroke({ width: 1, color: 0xffffff });
+      g.rect(-0.8, -17, 1.6, 4).fill(0xffffff);
+      g.rect(-0.8, -12, 1.6, 1.4).fill(0xffffff);
+    }
+    return;
+  }
   const tier = Math.min(4, Math.floor((u.level - 1) / 20));
   const grade = ((u.level - 1) % 5) + 1;
   g.circle(-7, -9, 3).fill(BADGE_COLORS[tier]).stroke({ width: 0.8, color: 0x000000, alpha: 0.6 });
@@ -182,7 +190,7 @@ function drawBadge(g: Graphics, u: Unit, commander: boolean): void {
 function updateUnitView(v: UnitView, u: Unit, timeSec: number, commander = false): void {
   v.root.visible = !u.garrison;
   if (u.garrison) return;
-  const badgeKey = `${u.level}|${commander}`;
+  const badgeKey = `${u.level}|${commander}|${u.terror > 0}`;
   if (badgeKey !== v.badgeKey) {
     v.badgeKey = badgeKey;
     drawBadge(v.badge, u, commander);

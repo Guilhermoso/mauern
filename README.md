@@ -30,6 +30,15 @@ o nível do treinador, mais rápido os outros aprendem; ele também ganha experi
 soldados cabem. O batalhão anda em formação, é selecionado como um só e pode ficar no modo manual, defender
 uma posição ou caçar titãs pelo mapa.
 
+**Treino em lotes:** unidades militares treinam em lotes de até 3, como no Age of Empires III — cada clique soma
+uma unidade ao lote, Shift+clique enfileira um lote cheio, e o lote sai junto (mais rápido do que um por um).
+O progresso aparece como uma pizza girando no sentido horário sobre o ícone.
+
+**Aldeões espertos:** quando um titã chega perto, os aldeões largam o que estão fazendo e correm para um abrigo
+— de preferência o **Campo de Refúgio**. Eles ficam aterrorizados por um tempo e não saem até o terror passar;
+um soldado no posto do refúgio acalma o terror mais rápido (quanto maior o nível, mais rápido). Depois, você
+escolhe: **Sair** (ficam ociosos) ou **Voltar ao trabalho** (retomam o que faziam antes de fugir).
+
 | Ação | Controle |
 | --- | --- |
 | Selecionar | Clique esquerdo; arraste para selecionar várias unidades; Shift+clique adiciona |
@@ -41,6 +50,8 @@ uma posição ou caçar titãs pelo mapa.
 | Treinar (Centro da Vila selecionado) | Q aldeão · E miliciano (Shift treina 5) |
 | Campo de treinamento (com aldeão selecionado) | Y. Depois: clique direito no campo com soldados e escolha o treinador no painel |
 | Formar batalhão | B com soldados selecionados · modos e "Desfazer" no painel do batalhão |
+| Campo de Refúgio (com aldeão selecionado) | U. Para pôr um guarda: clique direito no refúgio com um soldado |
+| Liberar abrigados (edifício selecionado) | U ou botões "Sair" / "Voltar ao trabalho" |
 | Atacar um titã | Selecione unidades e clique direito no titã |
 | Abrigar unidades | Clique direito no Centro da Vila ou numa torre · U libera os abrigados |
 | Sino de alarme (Centro da Vila selecionado) | B toca / desliga: aldeões se abrigam e depois voltam ao trabalho |

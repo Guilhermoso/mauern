@@ -11,6 +11,7 @@ import { clearPath, face, moveTo, separateUnits } from './movement';
 import { autoAcquire, updateAttack, updateGarrisonOrder } from './combat';
 import { updateTraining } from './soldiers';
 import { updateFollow } from './battalions';
+import { updateFleeOrder } from './refuge';
 import {
   buildingCenter,
   findFreeFarm,
@@ -58,6 +59,9 @@ export function updateUnits(sim: Sim): void {
         break;
       case 'follow':
         updateFollow(sim, u);
+        break;
+      case 'flee':
+        updateFleeOrder(sim, u, o);
         break;
       case 'garrison':
         if (!updateGarrisonOrder(sim, u, o) && !u.garrison) setIdle(u);
@@ -328,9 +332,14 @@ function afterBuilding(sim: Sim, u: Unit, b: Building): void {
 }
 
 export function unitStatus(sim: Sim, u: Unit): string {
+  const f = isFemaleName(u.name);
+  if (u.terror > 0) {
+    const where = u.garrison ? 'abrigad' + (f ? 'a' : 'o') : u.order.type === 'flee' ? 'fugindo de um titã' : 'escondid' + (f ? 'a' : 'o');
+    return `${f ? 'Aterrorizada' : 'Aterrorizado'} (${Math.ceil(u.terror)} s) — ${where}`;
+  }
   if (u.garrison) {
     const b = sim.building(u.garrison);
-    return `${isFemaleName(u.name) ? 'Abrigada' : 'Abrigado'} ${b ? `em ${BUILDING_DEFS[b.kind].name.toLowerCase()}` : ''}`;
+    return `${f ? 'Abrigada' : 'Abrigado'} ${b ? `em ${BUILDING_DEFS[b.kind].name.toLowerCase()}` : ''}`;
   }
   const o = u.order;
   const carrying = u.carry ? ` (carregando ${u.carry.amount})` : '';
@@ -366,6 +375,8 @@ export function unitStatus(sim: Sim, u: Unit): string {
     }
     case 'follow':
       return u.moving ? 'Marchando com o batalhão' : 'Em formação';
+    case 'flee':
+      return 'Fugindo de um titã!';
   }
 }
 
