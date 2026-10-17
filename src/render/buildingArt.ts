@@ -50,14 +50,14 @@ export const NEIGHBOR_DIRS = [
   [0, -1], [1, 0], [0, 1], [-1, 0], [1, -1], [1, 1], [-1, 1], [-1, -1],
 ] as const;
 
-export function drawBuildingArt(kind: BuildingKind, built: boolean, progress01: number, mask = 0, level = 1): BuildingArt {
+export function drawBuildingArt(kind: BuildingKind, built: boolean, progress01: number, mask = 0, level = 1, open = false): BuildingArt {
   const ts = BALANCE.world.tileSize;
   const size = BUILDING_DEFS[kind].size * ts;
   const root = new Container();
   const def = BUILDING_DEFS[kind];
 
   if (def.wall || def.gate) {
-    const art = def.wall ? drawPalisade(mask, ts) : drawGate(mask, ts);
+    const art = def.wall ? drawPalisade(mask, ts) : drawGate(mask, ts, open && built);
     if (!built) art.root.alpha = 0.3 + 0.5 * progress01;
     return art;
   }
@@ -122,13 +122,29 @@ function drawPalisade(mask: number, ts: number): BuildingArt {
 }
 
 // Portão: dois pilares e folhas de madeira, na direção da muralha.
-function drawGate(mask: number, ts: number): BuildingArt {
+function drawGate(mask: number, ts: number, open = false): BuildingArt {
   const root = new Container();
   const g = new Graphics();
   root.addChild(g);
   const vertical = (mask & 0b0101) !== 0 && (mask & 0b1010) === 0;
   const post = 0x8e8172;
   const casters = [vertical ? rectCaster(ts / 2 - 8, -3, 16, ts + 6, 6) : rectCaster(-3, ts / 2 - 8, ts + 6, 16, 6)];
+  if (open) {
+    // Aberto: só os pilares, e as duas folhas giradas para o lado, deixando a passagem livre.
+    const leaf = 0x6b4a2a;
+    if (vertical) {
+      g.rect(ts / 2 - 8, -3, 16, 7).fill(post);
+      g.rect(ts / 2 - 8, ts - 4, 16, 7).fill(post);
+      g.rect(ts / 2 - 9, 3, 4, ts / 2 - 3).fill(leaf);
+      g.rect(ts / 2 + 5, ts / 2, 4, ts / 2 - 3).fill(leaf);
+    } else {
+      g.rect(-3, ts / 2 - 8, 7, 16).fill(post);
+      g.rect(ts - 4, ts / 2 - 8, 7, 16).fill(post);
+      g.rect(3, ts / 2 - 9, ts / 2 - 3, 4).fill(leaf);
+      g.rect(ts / 2, ts / 2 + 5, ts / 2 - 3, 4).fill(leaf);
+    }
+    return { root, casters: [rectCaster(vertical ? ts / 2 - 8 : -3, vertical ? -3 : ts / 2 - 8, vertical ? 16 : 7, vertical ? 7 : 16, 6)] };
+  }
   if (vertical) {
     g.rect(ts / 2 - 7, 0, 14, ts).fill(0x6b4a2a);
     for (let y = 3; y < ts; y += 5) g.rect(ts / 2 - 7, y, 14, 1.2).fill(0x4a301a);

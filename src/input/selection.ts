@@ -19,6 +19,7 @@ import { battalionCommand, battalionOf, formBattalion } from '../systems/battali
 import { ringAlarm, stopAlarm } from '../systems/combat';
 import { releaseShelter } from '../systems/refuge';
 import { setIdle } from '../systems/units';
+import { poiAt } from '../systems/expeditions';
 
 export interface Selection {
   units: number[]; // unidades avulsas
@@ -26,6 +27,7 @@ export interface Selection {
   building: number | null;
   node: number | null;
   titan: number | null;
+  poi?: number | null; // ponto de interesse fora dos muros
 }
 
 export interface CommandMarker {
@@ -113,7 +115,7 @@ export class SelectionController {
       if (u.battalion) bats.add(u.battalion);
       else loose.push(id);
     }
-    this.selection = { units: loose, battalions: [...bats], building: sel.building ?? null, node: sel.node ?? null, titan: sel.titan ?? null };
+    this.selection = { units: loose, battalions: [...bats], building: sel.building ?? null, node: sel.node ?? null, titan: sel.titan ?? null, poi: sel.poi ?? null };
     this.changed = true;
   }
 
@@ -298,6 +300,11 @@ export class SelectionController {
     const b = this.sim.buildingAt(tx, ty);
     if (b) {
       this.setSelection({ building: b.id });
+      return;
+    }
+    const poi = poiAt(this.sim, tx, ty);
+    if (poi) {
+      this.setSelection({ poi: poi.id });
       return;
     }
     const n = this.sim.nodeAt(tx, ty);

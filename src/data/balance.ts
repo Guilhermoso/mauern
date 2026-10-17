@@ -39,6 +39,38 @@ export const BALANCE = {
     maxBatch: 3, // unidades militares treinadas juntas num lote (aldeões: sempre 1)
     batchExtraTime: 0.8, // cada unidade extra do lote soma 80% do tempo de uma unidade
   },
+  // Névoa de guerra: raio de visão em tiles.
+  fog: {
+    startRadius: 18, // área já conhecida no começo da partida
+    updateTicks: 10, // a visão é recalculada a cada 10 passos (0,5 s)
+    sight: { villager: 6, scout: 12, militia: 7 } as Record<string, number>,
+    buildingSight: 6,
+    buildingSightByKind: { townCenter: 11, watchTower: 13 } as Record<string, number>,
+  },
+  // Pontos de interesse fora dos muros.
+  pois: {
+    minDistance: 34, // tiles do centro: só lá fora
+    spacing: 18, // distância mínima entre dois pontos
+    count: { ruins: 6, survivors: 4, nest: 3, deposit: 3, lore: 4 } as Record<string, number>,
+    interactRadius: 2, // tiles: perto disso a unidade age no ponto
+    ruinsSearchSeconds: 12,
+    ruinsLoot: [
+      { iron: 120, stone: 80 },
+      { gold: 90, iron: 40 },
+      { food: 250, wood: 150 },
+      { gold: 60, stone: 150 },
+    ] as Partial<Record<'food' | 'wood' | 'stone' | 'iron' | 'gold', number>>[],
+    survivorsMin: 2,
+    survivorsMax: 4,
+    nestGuards: 2, // titãs que aparecem ao descobrir um ninho
+    nestClearSeconds: 15, // soldados no ninho, sem titãs por perto, por este tempo
+    nestClearRadius: 10, // tiles: nenhum titã a esta distância para limpar
+    nestSpawnShare: 0.35, // chance de um titã avulso surgir num ninho ativo (em vez da borda)
+    depositNodes: 7, // jazidas de ferro na jazida valiosa
+    depositAmountMult: 3, // cada uma com 3× o ferro normal
+    loreReadSeconds: 10,
+    successMorale: 6, // moral por missão cumprida fora dos muros (por 1 dia)
+  },
   // Nobreza: título concedido a soldados de nível alto.
   nobility: {
     minLevel: 70,
@@ -115,6 +147,7 @@ export const BALANCE = {
     wallCostBase: 6, // custo de atravessar uma estrutura no pathfinding (incentiva contornar)
     wallCostPerHp: 1 / 40, // estruturas mais fortes custam mais: os titãs procuram o ponto fraco
     forestCost: 3,
+    gateOpenSeconds: 3, // o portão fica aberto por este tempo depois que alguém passa (titãs podem entrar)
     wadeMinHeight: 4, // titãs a partir desta altura (m) atravessam água rasa
     shallowCost: 3, // custo de caminho na água rasa (evitam, mas cruzam se compensar)
     shallowSpeedFactor: 0.5, // velocidade dentro da água rasa

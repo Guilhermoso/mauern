@@ -2,6 +2,10 @@ import { CHRONICLES, CHRONICLE_IDS } from '../data/chronicles';
 import type { Sim } from '../core/sim';
 import { ERA_NAMES, eraMilestones } from '../systems/era';
 import { EVENT_DEFS, resolveEvent } from '../systems/events';
+import { rankName } from '../data/ranks';
+import { LORE } from '../data/lore';
+import { POI_HINTS, POI_NAMES, poiDirection, readLore } from '../systems/expeditions';
+import { UNIT_DEFS } from '../data/defs';
 
 // Painéis em janela: Caminho para a Próxima Era, Crônicas e cartas de evento.
 
@@ -202,5 +206,129 @@ export class EventCard {
       const ok = !c.enabled || c.enabled(this.sim, active.data);
       if (this.buttons[i]) this.buttons[i].disabled = !ok;
     });
+  }
+}
+
+// Memorial: todos os moradores que morreram, do mais recente ao mais antigo.
+export class MemorialPanel {
+  readonly el: HTMLDivElement;
+  private body: HTMLDivElement;
+
+  constructor(private sim: Sim) {
+    const shell = modalShell('Memorial', () => this.close());
+    this.el = shell.backdrop;
+    this.body = shell.body;
+  }
+
+  get isOpen(): boolean {
+    return !this.el.classList.contains('hidden');
+  }
+
+  open(): void {
+    this.render();
+    this.el.classList.remove('hidden');
+  }
+
+  close(): void {
+    this.el.classList.add('hidden');
+  }
+
+  render(): void {
+    const list = this.sim.state.memorial;
+    this.body.innerHTML = '';
+    const intro = document.createElement('p');
+    intro.className = 'muted';
+    intro.textContent = list.length
+      ? `Em memória dos ${list.length} que deram a vida pela muralha. Seus nomes não serão esquecidos.`
+      : 'Nenhum nome gravado ainda. Que continue assim.';
+    this.body.appendChild(intro);
+    if (!list.length) return;
+    const table = document.createElement('div');
+    table.className = 'memorial';
+    for (const m of [...list].reverse()) {
+      const row = document.createElement('div');
+      row.className = `memorial-row ${m.noble ? 'noble' : ''}`;
+      const military = m.kind === 'militia';
+      const who = `${m.noble ? '♛ ' : ''}${m.name}`;
+      const what = military ? `${rankName(m.level)} · ${m.kills} titãs` : UNIT_DEFS[m.kind].name;
+      row.innerHTML = '<span class="m-name"></span><span class="m-what"></span><span class="m-cause"></span><span class="m-day"></span>';
+      row.querySelector('.m-name')!.textContent = who;
+      row.querySelector('.m-what')!.textContent = what;
+      row.querySelector('.m-cause')!.textContent = m.cause;
+      row.querySelector('.m-day')!.textContent = `dia ${m.day}`;
+      table.appendChild(row);
+    }
+    this.body.appendChild(table);
+  }
+}
+
+// Descobertas: pontos de interesse encontrados fora dos muros e os fragmentos de história já lidos.
+export class DiscoveriesPanel {
+  readonly el: HTMLDivElement;
+  private body: HTMLDivElement;
+
+  constructor(private sim: Sim, private goTo: (tx: number, ty: number) => void) {
+    const shell = modalShell('Descobertas', () => this.close());
+    this.el = shell.backdrop;
+    this.body = shell.body;
+  }
+
+  get isOpen(): boolean {
+    return !this.el.classList.contains('hidden');
+  }
+
+  open(): void {
+    this.render();
+    this.el.classList.remove('hidden');
+  }
+
+  close(): void {
+    this.el.classList.add('hidden');
+  }
+
+  render(): void {
+    const pois = this.sim.state.pois;
+    this.body.innerHTML = '';
+    const found = pois.filter((p) => p.discovered);
+    const intro = document.createElement('p');
+    intro.className = 'muted';
+    intro.textContent = `Fora dos muros há muito a encontrar. Explore com batedores e escolte quem for trabalhar lá fora. Encontrados: ${found.length} de ${pois.length}.`;
+    this.body.appendChild(intro);
+    const list = document.createElement('div');
+    list.className = 'chronicles';
+    for (const p of found) {
+      const card = document.createElement('button');
+      card.className = `chronicle poi-card ${p.done ? 'done' : ''}`;
+      card.title = 'Clique para ver no mapa';
+      card.innerHTML = '<div class="c-name"></div><div class="c-desc"></div>';
+      card.querySelector('.c-name')!.textContent = `${p.done ? '✔ ' : ''}${POI_NAMES[p.kind]}`;
+      card.querySelector('.c-desc')!.textContent = `A ${poiDirection(this.sim, p)}. ${p.done ? 'Cumprido.' : POI_HINTS[p.kind]}`;
+      card.onclick = () => {
+        this.goTo(p.tx, p.ty);
+        this.close();
+      };
+      list.appendChild(card);
+    }
+    this.body.appendChild(list);
+    const read = readLore(this.sim);
+    const h = document.createElement('h3');
+    h.className = 'lore-head';
+    h.textContent = `Fragmentos de história (${read.length}/${LORE.length})`;
+    this.body.appendChild(h);
+    if (!read.length) {
+      const none = document.createElement('p');
+      none.className = 'muted';
+      none.textContent = 'Nenhum ainda. Procure os locais de história fora dos muros.';
+      this.body.appendChild(none);
+    }
+    for (const i of read) {
+      const f = LORE[i];
+      const box = document.createElement('div');
+      box.className = 'lore';
+      box.innerHTML = '<div class="lore-title"></div><div class="lore-text"></div>';
+      box.querySelector('.lore-title')!.textContent = f.title;
+      box.querySelector('.lore-text')!.textContent = f.text;
+      this.body.appendChild(box);
+    }
   }
 }

@@ -5,6 +5,7 @@ import { addLog } from '../state';
 import type { Building, Titan, Unit } from '../entities/types';
 import { BALANCE } from '../data/balance';
 import { clearPath } from './movement';
+import { getClock } from '../core/time';
 
 // Dano, morte e destruição: funções compartilhadas por titãs, combate e comandos do jogador.
 
@@ -28,6 +29,11 @@ export function killUnit(sim: Sim, u: Unit, cause: [string, string]): void {
   sim.state.stats.deaths++;
   addMoraleMod(sim, 'Morte de um morador', BALANCE.morale.deathPenalty, 48);
   const f = isFemaleName(u.name);
+  // Memorial: ninguém é esquecido.
+  sim.state.memorial.push({
+    name: u.name, kind: u.kind, day: getClock(sim.state.tick).day,
+    cause: f ? cause[1] : cause[0], level: u.level, kills: u.kills, noble: u.noble,
+  });
   if (u.noble) {
     addMoraleMod(sim, f ? 'Morte de uma nobre' : 'Morte de um nobre', BALANCE.nobility.deathMorale, 96);
     addLog(sim.state, `O povo está de luto: ${f ? 'a nobre' : 'o nobre'} ${u.name} caiu.`);

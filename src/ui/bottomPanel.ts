@@ -21,6 +21,7 @@ import { rankName, xpToNext, MAX_LEVEL } from '../data/ranks';
 import { isSoldier, setTrainer, trainees, trainer, trainingRate, dismissTraining } from '../systems/soldiers';
 import { battalionCapacity, battalionOf, battalionUnits, canChooseFormation, disbandBattalion, setAutoHospital, setCommander, setFormation, setMode, toggleCritical } from '../systems/battalions';
 import { canEnnoble, ennoble, nobleCost } from '../systems/nobility';
+import { POI_HINTS, POI_NAMES, poiDirection } from '../systems/expeditions';
 import { dismissDoctors, doctors, hospitalBeds, patients, startHospitalUpgrade, upgradeCost, upgradeTime } from '../systems/hospital';
 import { activeBuffs } from '../systems/buffs';
 import { buffFraction, honorBonus, honors, isLegend, leadershipBonus, shieldInfo, unitAttack } from '../systems/modifiers';
@@ -73,6 +74,10 @@ export class BottomPanel {
         ? `b:${b.id}:${b.built}:${b.queue.map((q) => q.count).join('.')}:${garrisonCount(this.sim, b) > 0}:${this.sim.state.alarm}:${b.research?.tech ?? ''}:${this.sim.state.techs.length}:${b.level}:${b.trainerId}:${b.guardId}:${b.doctorIds.length}:${b.upgradeProgress >= 0}:${b.kind === 'hospital' ? patients(this.sim, b).map((u) => u.id).join(',') : ''}:${b.kind === 'trainingGround' ? trainees(this.sim, b).map((u) => u.id).join(',') : ''}`
         : '';
     }
+    if (s.poi) {
+      const p = this.sim.state.pois.find((x) => x.id === s.poi);
+      return p ? `poi:${p.id}:${p.done}` : '';
+    }
     if (s.node !== null) return `n:${s.node}`;
     if (s.titan !== null) return `t:${s.titan}`;
     return '';
@@ -89,6 +94,7 @@ export class BottomPanel {
     else if (s.battalions.length) this.buildMixed(s.battalions, s.units);
     else if (s.units.length) this.buildUnits(s.units);
     else if (s.building !== null) this.buildBuilding(s.building);
+    else if (s.poi) this.buildPoi(s.poi);
     else if (s.node !== null) this.buildNode(s.node);
     else if (s.titan !== null) this.buildTitan(s.titan);
   }
@@ -641,6 +647,28 @@ export class BottomPanel {
       this.commands.appendChild(btn);
       this.updaters.push(() => btn.classList.toggle('disabled', !canAfford(this.sim, t.cost)));
     }
+  }
+
+  // Ponto de interesse fora dos muros: o que é, o que fazer e o andamento.
+  private buildPoi(id: number): void {
+    const p = this.sim.state.pois.find((x) => x.id === id);
+    if (!p) return;
+    this.header(cmdIconImg(`poi-${p.kind}`, 'portrait-img'), POI_NAMES[p.kind], `A ${poiDirection(this.sim, p)} da vila`);
+    const status = el('div', 'bp-line');
+    const bar = progressBar();
+    this.info.append(status);
+    const P = BALANCE.pois;
+    const total = p.kind === 'ruins' ? P.ruinsSearchSeconds : p.kind === 'lore' ? P.loreReadSeconds : p.kind === 'nest' ? P.nestClearSeconds : 0;
+    if (total && !p.done) this.info.append(bar.el);
+    this.updaters.push(() => {
+      if (p.done) status.textContent = { ruins: 'Já vasculhadas.', survivors: 'Resgatados.', nest: 'Destruído.', deposit: 'Esgotada.', lore: 'Já lido (veja em Descobertas).' }[p.kind];
+      else if (p.kind === 'survivors') status.textContent = `${p.value} pessoas esperando resgate.`;
+      else if (total) status.textContent = p.progress > 0 ? `Andamento: ${Math.floor((p.progress / total) * 100)}%` : 'Ninguém trabalhando aqui.';
+      else status.textContent = '';
+      bar.set(total ? p.progress / total : 0);
+    });
+    if (!p.done) this.info.append(el('div', 'bp-hint', POI_HINTS[p.kind]));
+    this.info.append(el('div', 'bp-hint', 'Selecione unidades e clique com o botão direito aqui para mandá-las. Cuidado: lá fora não há muralhas.'));
   }
 
   private buildNode(id: number): void {

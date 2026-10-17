@@ -16,7 +16,7 @@ export type Fx =
 
 // Avisos ao jogador (notificação + som). A interface os consome.
 export interface Alert {
-  kind: 'sighted' | 'underAttack' | 'greatAttack' | 'death' | 'destroyed' | 'victory' | 'chronicle' | 'research' | 'event' | 'promotion';
+  kind: 'sighted' | 'underAttack' | 'greatAttack' | 'death' | 'destroyed' | 'victory' | 'chronicle' | 'research' | 'event' | 'promotion' | 'discovery';
   text: string;
   x: number;
   y: number;
@@ -37,11 +37,17 @@ export class Sim {
   lastRepath = new Map<number, number>();
   // Titãs intimidados por uma lenda neste passo (derivado; não é salvo).
   intimidated = new Set<number>();
+  // Névoa de guerra: tiles à vista agora (derivado; o que já foi visto fica em state.explored).
+  visible: Uint8Array;
+  fogVersion = 0; // muda a cada recálculo, para a renderização saber quando redesenhar
+  // Portões abertos: até que tick cada um fica aberto (derivado; fecham sozinhos).
+  gateOpenUntil = new Map<number, number>();
 
   constructor(readonly state: GameState) {
     this.nav = new NavGrid(state.world);
     this.rng = new Rng(state.rngState);
     this.buildingGrid = new Int32Array(state.world.width * state.world.height);
+    this.visible = new Uint8Array(state.world.width * state.world.height);
     for (const n of state.world.resourceNodes) this.indexNode(n);
     for (const b of state.buildings) this.occupyBuilding(b);
   }

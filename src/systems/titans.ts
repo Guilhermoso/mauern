@@ -9,6 +9,8 @@ import { Tile } from '../world/terrain';
 import { stepToward } from './movement';
 import { damageBuilding, damageUnit, titanRadius } from './damage';
 import { titanDamageFactor } from './nobility';
+import { nestSpawnPoint } from './expeditions';
+import { isGateOpen } from './gates';
 
 const T = BALANCE.titans;
 const TPS = BALANCE.time.ticksPerSecond;
@@ -117,7 +119,8 @@ export function updateThreat(sim: Sim): void {
   // Titãs avulsos: só de dia; o intervalo diminui com os dias até o piso da era.
   if (state.tick >= th.nextSpawnTick) {
     if (isDaytime(state.tick) && state.titans.length < T.maxAlive) {
-      spawnTitan(sim, rollHeight(sim, clock.day));
+      // Às vezes o titã sai de um ninho ativo, em vez da borda do mapa.
+      spawnTitan(sim, rollHeight(sim, clock.day), undefined, nestSpawnPoint(sim) ?? undefined);
       const hours = Math.max(T.minIntervalHours, T.startIntervalHours - T.intervalDecayPerDay * (clock.day - T.firstSpawnDay));
       th.nextSpawnTick = state.tick + Math.round(hours * sim.rng.range(0.7, 1.3) * TICKS_PER_HOUR);
     } else {
@@ -179,7 +182,8 @@ function titanCost(sim: Sim, wade: boolean): CostFn {
     const id = sim.buildingIdAt(x, y);
     if (id) {
       const b = sim.building(id);
-      if (b && !BUILDING_DEFS[b.kind].walkable) return T.wallCostBase + b.hp * T.wallCostPerHp;
+      // Portão aberto: passagem livre.
+      if (b && !BUILDING_DEFS[b.kind].walkable && !isGateOpen(sim, b)) return T.wallCostBase + b.hp * T.wallCostPerHp;
     }
     if (sim.nodeAt(x, y)) return T.forestCost;
     return 1;
@@ -355,7 +359,18 @@ function targetGone(sim: Sim, t: Titan): boolean {
 
 function structureAt(sim: Sim, tx: number, ty: number): Building | undefined {
   const b = sim.buildingAt(tx, ty);
+  if (b && isGateOpen(sim, b)) {
+    gateBreach(sim, b);
+    return undefined;
+  }
   return b && !BUILDING_DEFS[b.kind].walkable ? b : undefined;
+}
+
+// Um titã passando por um portão aberto: aviso urgente.
+function gateBreach(sim: Sim, b: Building): void {
+  const ts = sim.tileSize;
+  const text = 'Um titã está entrando pelo portão aberto!';
+  if (!sim.alerts.some((a) => a.text === text)) sim.alerts.push({ kind: 'underAttack', text, x: (b.tx + 0.5) * ts, y: (b.ty + 0.5) * ts });
 }
 
 function attackOrApproach(sim: Sim, t: Titan, b: Building, damage: number, speed: number): void {

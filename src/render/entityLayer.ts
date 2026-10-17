@@ -5,6 +5,9 @@ import type { Sim } from '../core/sim';
 import type { Building, ResourceKind, Unit } from '../entities/types';
 import { PLAYER_COLOR } from './colors';
 import { daylight, getClock } from '../core/time';
+import { isVisible } from '../systems/fog';
+import { drawPoi } from './poiArt';
+import { isGateOpen } from '../systems/gates';
 import { drawBuildingArt, NEIGHBOR_DIRS, type BuildingArt, type Caster } from './buildingArt';
 import { createTitanView, updateTitanView, type TitanView } from './titanArt';
 
@@ -55,6 +58,7 @@ export class EntityLayer {
   private buildings = new Map<number, BuildingView>();
   private units = new Map<number, UnitView>();
   private titans = new Map<number, TitanView>();
+  private pois = new Map<number, { g: Graphics; key: string }>();
 
   constructor() {
     this.container.sortableChildren = true;
@@ -74,14 +78,15 @@ export class EntityLayer {
       const def = BUILDING_DEFS[b.kind];
       const p = b.built ? 1 : b.progress / def.buildTime;
       const mask = def.wall || def.gate ? wallMask(sim, b) : 0;
-      const key = `${b.built}|${Math.floor(p * 10)}|${mask}|${b.level}`;
+      const open = def.gate ? isGateOpen(sim, b) : false;
+      const key = `${b.built}|${Math.floor(p * 10)}|${mask}|${b.level}|${open}`;
       let v = this.buildings.get(b.id);
       if (!v || v.key !== key) {
         if (v) {
           v.art.root.destroy({ children: true });
           v.shadow?.destroy();
         }
-        const art = drawBuildingArt(b.kind, b.built, p, mask, b.level);
+        const art = drawBuildingArt(b.kind, b.built, p, mask, b.level, open);
         let shadow: Graphics | null = null;
         if (art.casters?.length) {
           shadow = new Graphics();
@@ -150,11 +155,27 @@ export class EntityLayer {
         this.container.addChild(v.root);
       }
       updateTitanView(v, t, state.tick, BALANCE.titans.attackCooldown);
+      // Fora da visão (névoa de guerra), o titã não aparece.
+      v.root.visible = sim.fogVersion === 0 || isVisible(sim, t.x, t.y);
     }
     for (const [id, v] of this.titans) {
       if (!aliveT.has(id)) {
         v.root.destroy({ children: true });
         this.titans.delete(id);
+      }
+    }
+
+    // Pontos de interesse já descobertos (no chão, abaixo das unidades).
+    for (const p of state.pois) {
+      if (!p.discovered) continue;
+      const key = `${p.kind}|${p.done}`;
+      let v = this.pois.get(p.id);
+      if (!v || v.key !== key) {
+        v?.g.destroy();
+        v = { g: drawPoi(p.kind, p.done), key };
+        v.g.position.set((p.tx + 0.5) * ts, (p.ty + 0.5) * ts);
+        this.ground.addChild(v.g);
+        this.pois.set(p.id, v);
       }
     }
   }

@@ -52,6 +52,13 @@ aldeões designados como médicos curam um soldado cada por vez, e quem chega a 
 com ✚ abaixo de 30% de vida — por padrão só o comandante) correm sozinhos para um hospital com leitos para
 todos, entram juntos e saem juntos quando todos sararem.
 
+**Mundo externo:** o mapa começa coberto pela **névoa de guerra** — só se vê o que unidades e edifícios
+enxergam (batedores veem longe). Lá fora há **pontos de interesse**: ruínas para vasculhar (recursos), sobreviventes
+para resgatar (viram aldeões), ninhos de titãs para destruir (de onde vêm titãs), jazidas de ferro valiosas e locais
+de história com fragmentos sobre a origem dos titãs. Selecione unidades e clique com o botão direito no ponto para
+mandá-las; o andamento aparece no painel. Tudo o que foi encontrado fica em **Descobertas**. Os **portões** abrem
+quando alguém passa — e, abertos, deixam titãs entrar. Quem morre fica gravado no **Memorial**.
+
 **Aldeões espertos:** quando um titã chega perto, os aldeões largam o que estão fazendo e correm para um abrigo
 — de preferência o **Campo de Refúgio**. Eles ficam aterrorizados por um tempo e não saem até o terror passar;
 um soldado no posto do refúgio acalma o terror mais rápido (quanto maior o nível, mais rápido). Depois, você

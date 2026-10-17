@@ -460,6 +460,47 @@ const DRAW: Record<string, (ctx: Ctx) => void> = {
   },
   'res-pop': (c) => house(c, 14, 14, 36, 40, '#3a6fd8', '#d8c49a'),
 
+  // --- Pontos de interesse ---
+  'poi-ruins': (c) => {
+    rect(c, 10, 30, 12, 26, STONE, '#3a3530', 2);
+    rect(c, 26, 40, 12, 16, STONE, '#3a3530', 2);
+    poly(c, [42, 56, 42, 22, 50, 18, 54, 26, 54, 56], STONE, '#3a3530', 2);
+    poly(c, [8, 30, 16, 22, 24, 30], '#8a857a', '#3a3530', 1.5);
+    line(c, [14, 40, 18, 46], '#6a655c', 2);
+  },
+  'poi-survivors': (c) => {
+    poly(c, [8, 50, 26, 16, 44, 50], '#d8c49a', '#5a4a2a', 2);
+    line(c, [26, 16, 26, 50], '#5a4a2a', 1.5);
+    circle(c, 48, 26, 5, '#e8c39e', '#5a3a1e', 1.5);
+    poly(c, [42, 54, 43, 32, 53, 32, 54, 54], BLUE, '#1a120a', 1.5);
+    flame(c, 32, 54, 0.3);
+  },
+  'poi-nest': (c) => {
+    c.beginPath();
+    c.ellipse(32, 38, 24, 16, 0, 0, Math.PI * 2);
+    c.fillStyle = '#3a2a22';
+    c.fill();
+    c.lineWidth = 3;
+    c.strokeStyle = '#6a3a2a';
+    c.stroke();
+    line(c, [18, 34, 30, 40], '#e8dcc6', 3);
+    line(c, [36, 30, 46, 42], '#e8dcc6', 3);
+    circle(c, 26, 20, 5, 'rgba(230,230,230,0.6)', '', 0);
+    circle(c, 36, 14, 4, 'rgba(230,230,230,0.45)', '', 0);
+  },
+  'poi-deposit': (c) => {
+    DRAW['res-iron'](c);
+    line(c, [48, 8, 48, 30], WOOD_DARK, 3);
+    poly(c, [48, 8, 60, 13, 48, 18], GOLD, '#6a4a10', 1.5);
+  },
+  'poi-lore': (c) => {
+    poly(c, [20, 58, 22, 14, 32, 6, 42, 14, 44, 58], '#9a958a', '#3a3530', 2.5);
+    line(c, [28, 22, 36, 22], '#4a4a6a', 2);
+    line(c, [27, 30, 37, 30], '#4a4a6a', 2);
+    line(c, [29, 38, 35, 38], '#4a4a6a', 2);
+    circle(c, 32, 46, 3, '#5fd3e6', '', 0);
+  },
+
   // --- Outros retratos ---
   titan: (c) => {
     circle(c, 32, 22, 12, '#d9a08a', '#5a2a1a', 2);

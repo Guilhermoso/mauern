@@ -263,7 +263,7 @@ Construir o jogo em incrementos, cada um jogável e testado antes do próximo:
 2. **RTS básico**: seleção, comandos, pathfinding, aldeões coletando e entregando recursos, construção de edifícios da Era I e população.
 3. **Ameaça**: titãs comuns, ciclo dia/noite, combate, paliçadas, portões, torres, guarnição, brechas e reparo.
 4. **Era I completa**: casas evoluindo, necessidades, estações, tecnologias da Era I, marcos, crônicas e Grandes Ataques. Balancear para 2–3 horas.
-5. **Mundo externo**: névoa de guerra, pontos de interesse, expedições, sobreviventes, soldados nomeados e memorial.
+5. **Mundo externo**: névoa de guerra, pontos de interesse, expedições, sobreviventes, soldados nomeados e memorial. ✔ (feito; os sinalizadores verde/vermelho/preto ficam para quando houver titãs anormais, na Era II)
 6. **Era II**: cadeias de produção, muros de pedra, novas unidades e necessidades, titãs anormais e eventos em cartas.
 7. **Era III**: equipamento de manobra 3D (ver 9.1), gás, canhões, postos avançados, Titã Blindado.
 8. **Era IV**: Grande Muralha, elite, Titã Colossal, cultura, decorações e estatísticas.

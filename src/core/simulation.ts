@@ -12,6 +12,9 @@ import { updateBattalions } from '../systems/battalions';
 import { updateFear, updateTerror } from '../systems/refuge';
 import { updateHospitals } from '../systems/hospital';
 import { payNobles, updateValor } from '../systems/nobility';
+import { updateFog } from '../systems/fog';
+import { updateExpeditions } from '../systems/expeditions';
+import { updateGates } from '../systems/gates';
 
 // Um passo fixo da simulação. Não depende da renderização.
 export function step(sim: Sim): void {
@@ -20,8 +23,11 @@ export function step(sim: Sim): void {
   state.tick++;
   const after = getClock(state.tick);
 
+  updateFog(sim, sim.fogVersion === 0);
   updateThreat(sim);
   updateValor(sim);
+  updateExpeditions(sim);
+  updateGates(sim);
   updateProduction(sim);
   updateBattalions(sim);
   updateFear(sim);

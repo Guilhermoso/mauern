@@ -6,6 +6,7 @@ import type { Building, BuildingKind, ResourceKind, Unit, UnitKind } from '../en
 import { TILE_INFO } from '../world/terrain';
 import { getTile } from '../world/world';
 import { farmTaken, findNearestNode, gathererCounts, isExposed } from './queries';
+import { isVisible } from './fog';
 import { buildingMaxHp } from './modifiers';
 import { commandTrain } from './soldiers';
 import { commandHospital } from './hospital';
@@ -148,6 +149,8 @@ export function titanAt(sim: Sim, wx: number, wy: number, slack = 4): number | n
   let best: number | null = null;
   let bestD = Infinity;
   for (const t of sim.state.titans) {
+    // Titã escondido pela névoa de guerra não pode ser clicado.
+    if (sim.fogVersion > 0 && !isVisible(sim, t.x, t.y)) continue;
     const d = Math.hypot(t.x - wx, t.y - wy);
     if (d <= titanRadius(t.height) + slack && d < bestD) {
       bestD = d;

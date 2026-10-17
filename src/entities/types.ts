@@ -181,6 +181,31 @@ export interface MoraleModifier {
   expiresTick: number;
 }
 
+// Memorial: cada morador que morreu, para sempre lembrado.
+export interface MemorialEntry {
+  name: string;
+  kind: UnitKind;
+  day: number;
+  cause: string; // "devorado por um titã", "levada pela febre"...
+  level: number;
+  kills: number;
+  noble: boolean;
+}
+
+// Pontos de interesse fora dos muros, revelados ao explorar.
+export type PoiKind = 'ruins' | 'survivors' | 'nest' | 'deposit' | 'lore';
+
+export interface Poi {
+  id: number;
+  kind: PoiKind;
+  tx: number;
+  ty: number;
+  discovered: boolean; // já foi visto (aparece no mapa e no minimapa)
+  done: boolean; // saqueado, resgatado, limpo ou lido
+  progress: number; // segundos de busca/leitura/limpeza já feitos
+  value: number; // ruínas: tipo do saque; sobreviventes: quantos; história: qual fragmento
+}
+
 export interface Stats {
   titansKilled: number;
   deaths: number;

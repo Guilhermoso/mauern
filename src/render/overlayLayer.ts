@@ -32,6 +32,17 @@ export class OverlayLayer {
     const s = sel.selection;
     const pt0 = () => sel.placementTile();
 
+    // Pontos de interesse: anel no selecionado e barra de andamento (busca, leitura, limpeza).
+    for (const p of sim.state.pois) {
+      if (!p.discovered || p.done) continue;
+      const px = (p.tx + 0.5) * ts;
+      const py = (p.ty + 0.5) * ts;
+      if (s.poi === p.id) under.circle(px, py, 34).stroke({ width: line * 1.5, color: 0xffd34d });
+      const P = BALANCE.pois;
+      const total = p.kind === 'ruins' ? P.ruinsSearchSeconds : p.kind === 'lore' ? P.loreReadSeconds : p.kind === 'nest' ? P.nestClearSeconds : 0;
+      if (total && p.progress > 0) bar(g, px - 16, py - 40, 32, p.progress / total, 0xffd34d);
+    }
+
     // Seleção em caixa em andamento: destaca quem será selecionado ao soltar o botão.
     for (const u of sel.boxPreview()) {
       const r = UNIT_DEFS[u.kind].radius;

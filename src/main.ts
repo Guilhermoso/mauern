@@ -12,10 +12,12 @@ import { Camera } from './render/camera';
 import { TerrainLayer } from './render/terrainLayer';
 import { EntityLayer } from './render/entityLayer';
 import { Lighting } from './render/lighting';
+import { FogLayer } from './render/fogLayer';
+import { updateFog } from './systems/fog';
 import { OverlayLayer } from './render/overlayLayer';
 import { FxLayer } from './render/fxLayer';
 import { bell, chime, horn, setSoundEnabled, soundEnabled, thud, unlockAudioOnGesture } from './audio/sfx';
-import { ChroniclesPanel, EraPanel, EventCard } from './ui/panels';
+import { ChroniclesPanel, DiscoveriesPanel, MemorialPanel, EraPanel, EventCard } from './ui/panels';
 import type { Alert } from './core/sim';
 import { spawnTitanNear } from './systems/titans';
 import { CameraInput, isTyping } from './input/cameraInput';
@@ -71,7 +73,9 @@ async function boot(): Promise<void> {
   const entities = new EntityLayer();
   const overlay = new OverlayLayer();
   const fx = new FxLayer();
-  world.addChild(terrain.container, entities.ground, entities.shadows, overlay.under, entities.container, fx.g, overlay.over);
+  const fog = new FogLayer(sim);
+  updateFog(sim, true);
+  world.addChild(terrain.container, entities.ground, entities.shadows, overlay.under, entities.container, fx.g, fog.sprite, overlay.over);
   const lighting = new Lighting();
   app.stage.addChild(world, lighting.overlay, overlay.screen);
 
@@ -124,15 +128,19 @@ async function boot(): Promise<void> {
     selectIdle: () => selection.selectNextIdle(),
     openEra: () => eraPanel.open(),
     openChronicles: () => chroniclesPanel.open(),
+    openMemorial: () => memorialPanel.open(),
+    openDiscoveries: () => discoveriesPanel.open(),
   });
   const eraPanel = new EraPanel(sim);
   const chroniclesPanel = new ChroniclesPanel(sim);
+  const memorialPanel = new MemorialPanel(sim);
+  const discoveriesPanel = new DiscoveriesPanel(sim, (tx, ty) => camera.centerOn((tx + 0.5) * BALANCE.world.tileSize, (ty + 0.5) * BALANCE.world.tileSize));
   // Carta de evento: o jogo pausa enquanto ela está aberta.
   let speedBeforeEvent = -1;
   const eventCard = new EventCard(sim, (text) => hud.toast(text));
   const selection = new SelectionController(sim, camera, app.canvas, (t) => hud.toast(t));
   const bottom = new BottomPanel(sim, selection, (t) => hud.toast(t));
-  const minimap = new Minimap(state, camera);
+  const minimap = new Minimap(state, camera, sim);
   let speedBeforeMenu = state.speed;
   const menu = new Menu({
     saveNow: () => void save(true),
@@ -201,7 +209,7 @@ async function boot(): Promise<void> {
     gameOver.classList.remove('hidden');
   };
 
-  ui.append(hud.topbar, hud.paused, minimap.el, hud.resPanel, bottom.el, hud.log, hud.toasts, debug.el, eraPanel.el, chroniclesPanel.el, eventCard.el, menu.el, gameOver);
+  ui.append(hud.topbar, hud.paused, minimap.el, hud.resPanel, bottom.el, hud.log, hud.toasts, debug.el, eraPanel.el, chroniclesPanel.el, memorialPanel.el, discoveriesPanel.el, eventCard.el, menu.el, gameOver);
   if (loadWarning) hud.toast(loadWarning);
 
   // Avisos da simulação: notificação clicável (leva a câmera ao local) e som, sem repetir demais.
@@ -210,6 +218,7 @@ async function boot(): Promise<void> {
     sighted: 6000,
     underAttack: 15000,
     greatAttack: 0,
+    discovery: 0,
     death: 2500,
     destroyed: 4000,
     victory: 0,
@@ -250,6 +259,10 @@ async function boot(): Promise<void> {
       case 'promotion':
         hud.toast(a.text, goTo, false, true);
         break;
+      case 'discovery':
+        hud.toast(a.text, goTo, false, true);
+        chime();
+        break;
     }
   };
 
@@ -260,6 +273,8 @@ async function boot(): Promise<void> {
       if (menu.isOpen) menu.close();
       else if (eraPanel.isOpen) eraPanel.close();
       else if (chroniclesPanel.isOpen) chroniclesPanel.close();
+      else if (memorialPanel.isOpen) memorialPanel.close();
+      else if (discoveriesPanel.isOpen) discoveriesPanel.close();
       else if (!selection.handleKey(e)) openMenu();
       return;
     }
@@ -327,6 +342,7 @@ async function boot(): Promise<void> {
       sim.alerts = [];
     }
     overlay.update(sim, selection, camera.zoom, animSec);
+    fog.update();
     lighting.update(getClock(state.tick).dayFraction, camera, state, animSec);
 
     if (selection.consumeChanged()) bottom.update();

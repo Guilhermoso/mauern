@@ -8,7 +8,9 @@ import type {
   BuildingKind,
   CityState,
   EventState,
+  MemorialEntry,
   MoraleModifier,
+  Poi,
   Resources,
   Stats,
   ThreatState,
@@ -18,8 +20,9 @@ import type {
 } from './entities/types';
 import { BUILDING_DEFS, UNIT_DEFS } from './data/defs';
 import { randomName } from './entities/names';
+import { generatePois } from './world/pois';
 
-export const SAVE_VERSION = 8;
+export const SAVE_VERSION = 9;
 
 export interface LogEntry {
   tick: number;
@@ -56,6 +59,9 @@ export interface GameState {
   events: EventState;
   battalions: Battalion[];
   battalionCount: number; // para numerar os batalhões (1º, 2º, ...)
+  memorial: MemorialEntry[];
+  pois: Poi[];
+  explored: Uint8Array; // névoa de guerra: 1 = tile já visto alguma vez
   nextId: number;
   camera: CameraState;
   log: LogEntry[];
@@ -69,8 +75,12 @@ export function createNewGame(seed: string): GameState {
   const tcX = world.width / 2 - tcSize / 2;
   const tcY = world.height / 2 - tcSize / 2;
 
+  // Pontos de interesse (as jazidas valiosas acrescentam recursos ao mapa).
+  let nodeId = world.resourceNodes.reduce((m, n) => Math.max(m, n.id), 0) + 1;
+  const pois = generatePois(world, seed, () => nodeId++);
+
   // IDs de entidades começam depois dos IDs dos recursos do mapa.
-  let nextId = world.resourceNodes.reduce((m, n) => Math.max(m, n.id), 0) + 1;
+  let nextId = nodeId;
 
   const buildings: Building[] = [newBuilding(nextId++, 'townCenter', tcX, tcY, true)];
 
@@ -109,10 +119,26 @@ export function createNewGame(seed: string): GameState {
     events: { nextDay: BALANCE.events.firstDay, active: null },
     battalions: [],
     battalionCount: 0,
+    memorial: [],
+    pois,
+    explored: initialExplored(world.width, world.height, [{ x: world.width / 2, y: world.height / 2, r: BALANCE.fog.startRadius }]),
     nextId,
     camera: { x: centerX, y: centerY, zoom: 1 },
     log: [{ tick: 0, text: 'Um pequeno grupo de sobreviventes funda um refúgio. Que estas terras nos protejam.' }],
   };
+}
+
+// Névoa inicial: só os discos informados (em tiles) já foram vistos.
+export function initialExplored(width: number, height: number, discs: { x: number; y: number; r: number }[]): Uint8Array {
+  const out = new Uint8Array(width * height);
+  for (const d of discs) {
+    for (let y = Math.max(0, Math.floor(d.y - d.r)); y <= Math.min(height - 1, Math.ceil(d.y + d.r)); y++) {
+      for (let x = Math.max(0, Math.floor(d.x - d.r)); x <= Math.min(width - 1, Math.ceil(d.x + d.r)); x++) {
+        if ((x - d.x) ** 2 + (y - d.y) ** 2 <= d.r * d.r) out[y * width + x] = 1;
+      }
+    }
+  }
+  return out;
 }
 
 export function newBuilding(id: number, kind: BuildingKind, tx: number, ty: number, built: boolean): Building {

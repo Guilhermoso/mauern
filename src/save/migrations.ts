@@ -1,4 +1,6 @@
-import { SAVE_VERSION, type GameState } from '../state';
+import { SAVE_VERSION, initialExplored, type GameState } from '../state';
+import { BALANCE } from '../data/balance';
+import { generatePois } from '../world/pois';
 
 // Cada migração recebe um save da versão N e devolve o save na versão N + 1.
 // Ao mudar a estrutura do GameState: incremente SAVE_VERSION e adicione a migração aqui.
@@ -111,6 +113,19 @@ const MIGRATIONS: Record<number, Migration> = {
     units: save.units.map((u: any) => ({ ...u, noble: false, kills: 0, shield: 0, lastCombatTick: 0, speedBonus: 0 })),
     battalions: save.battalions.map((b: any) => ({ ...b, formation: 'block' })),
   }),
+  // v8 → v9: mundo externo — névoa de guerra, pontos de interesse e memorial.
+  8: (save) => {
+    const w = save.world;
+    const ts = BALANCE.world.tileSize;
+    // Já foi visto o que está perto da cidade e dos moradores atuais.
+    const discs = [
+      { x: w.width / 2, y: w.height / 2, r: BALANCE.fog.startRadius },
+      ...save.buildings.map((b: any) => ({ x: b.tx + 1, y: b.ty + 1, r: 12 })),
+      ...save.units.map((u: any) => ({ x: u.x / ts, y: u.y / ts, r: 10 })),
+    ];
+    const pois = generatePois(w, save.seed, () => save.nextId++, (x, y) => save.buildings.some((b: any) => Math.abs(b.tx - x) < 6 && Math.abs(b.ty - y) < 6));
+    return { ...save, version: 9, memorial: [], pois, explored: initialExplored(w.width, w.height, discs) };
+  },
 };
 
 export function migrate(save: any): GameState {

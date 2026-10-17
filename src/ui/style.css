@@ -372,3 +372,18 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
 .bottom ::-webkit-scrollbar-track, .log::-webkit-scrollbar-track { background: rgba(0, 0, 0, 0.35); }
 .bottom ::-webkit-scrollbar-thumb, .log::-webkit-scrollbar-thumb { background: linear-gradient(90deg, #8a6a34, #c9a24a); border-radius: 4px; }
 .bottom *, .log { scrollbar-color: #a8843c rgba(0, 0, 0, 0.35); scrollbar-width: thin; }
+
+/* Memorial */
+.memorial { display: flex; flex-direction: column; gap: 3px; font-size: 13px; }
+.memorial-row { display: grid; grid-template-columns: 1.4fr 1.3fr 1.4fr 0.5fr; gap: 8px; padding: 5px 8px; background: rgba(0, 0, 0, 0.25); border-left: 3px solid #6a5a44; }
+.memorial-row.noble { border-left-color: var(--gold); }
+.memorial-row .m-name { font-family: var(--serif); color: var(--gold-light); }
+.memorial-row .m-what, .memorial-row .m-day { color: var(--muted); }
+.memorial-row .m-cause { font-style: italic; }
+
+/* Descobertas */
+.poi-card { text-align: left; cursor: pointer; display: block; width: 100%; }
+.lore-head { font-family: var(--serif); color: var(--gold-light); font-variant: small-caps; margin: 14px 0 6px; font-size: 17px; }
+.lore { padding: 10px 12px; margin-bottom: 8px; background: linear-gradient(180deg, rgba(232, 220, 176, 0.12), rgba(232, 220, 176, 0.05)); border-left: 3px solid var(--gold); }
+.lore-title { font-family: var(--serif); font-weight: 700; color: var(--gold-light); margin-bottom: 4px; }
+.lore-text { font-family: var(--serif); font-style: italic; line-height: 1.5; }

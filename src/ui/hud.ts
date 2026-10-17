@@ -14,6 +14,8 @@ export interface HudActions {
   selectIdle(): void;
   openEra(): void;
   openChronicles(): void;
+  openMemorial(): void;
+  openDiscoveries(): void;
 }
 
 const RESOURCES: { key: ResourceKind; label: string; color: string }[] = [
@@ -100,7 +102,17 @@ export class Hud {
     this.clockEl.className = 'clock';
     this.threatEl.className = 'threat';
     this.threatEl.title = 'Próximo Grande Ataque: uma horda de titãs, anunciada na véspera';
-    this.topbar.append(era, chron, this.threatEl, this.seasonEl, this.clockEl);
+    const memorial = document.createElement('button');
+    memorial.className = 'chron-link';
+    memorial.textContent = 'Memorial';
+    memorial.title = 'Os moradores que morreram';
+    memorial.onclick = () => this.actions.openMemorial();
+    const disc = document.createElement('button');
+    disc.className = 'chron-link';
+    disc.textContent = 'Descobertas';
+    disc.title = 'O que foi encontrado fora dos muros';
+    disc.onclick = () => this.actions.openDiscoveries();
+    this.topbar.append(era, chron, disc, memorial, this.threatEl, this.seasonEl, this.clockEl);
     this.paused.className = 'paused panel hidden';
     this.paused.textContent = 'PAUSADO — Espaço para continuar';
 
