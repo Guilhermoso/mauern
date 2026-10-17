@@ -219,6 +219,24 @@ export function formationSlot(sim: Sim, b: Battalion, commander: Unit, index: nu
   };
 }
 
+// O comandante anda no passo do mais lento, para o batalhão não se separar — e mais devagar ainda
+// enquanto a formação estiver desfeita: com a mesma velocidade, os soldados nunca alcançariam os
+// lugares ao lado ou à frente dele (o batalhão virava uma fila atrás do comandante).
+function setCommanderPace(sim: Sim, b: Battalion, c: Unit, units: Unit[]): void {
+  const slowest = Math.min(...units.map((u) => UNIT_DEFS[u.kind].speed));
+  const ts = sim.tileSize;
+  let spread = 0;
+  b.memberIds.forEach((id, i) => {
+    const m = sim.unit(id);
+    if (!m || m.order.type !== 'follow') return;
+    const slot = formationSlot(sim, b, c, i);
+    spread = Math.max(spread, Math.hypot(slot.x - m.x, slot.y - m.y));
+  });
+  const F = BALANCE.soldiers;
+  const pace = spread > F.formationRegroupTiles * ts ? F.formationRegroupPace : spread > F.formationLooseTiles * ts ? F.formationLoosePace : 1;
+  for (const u of units) u.speedCap = u === c ? slowest * (1 + u.speedBonus) * pace : 0;
+}
+
 export function updateFollow(sim: Sim, u: Unit): void {
   const b = battalionOf(sim, u.battalion);
   const c = b && sim.unit(b.commanderId);
@@ -339,8 +357,7 @@ export function updateBattalions(sim: Sim): void {
       continue;
     }
     // O comandante anda no passo do mais lento, para o batalhão não se separar.
-    const slowest = Math.min(...units.map((u) => UNIT_DEFS[u.kind].speed));
-    for (const u of units) u.speedCap = u === c ? slowest * (1 + u.speedBonus) : 0;
+    setCommanderPace(sim, b, c, units);
 
     // Decide a ordem do batalhão conforme o modo.
     if (b.order.type === 'attack' && !sim.titan(b.order.titanId)) b.order = { type: 'idle' };
@@ -389,8 +406,7 @@ function updateHospitalMarch(sim: Sim, b: Battalion, c: Unit, units: Unit[]): vo
     return;
   }
   const ts = sim.tileSize;
-  const slowest = Math.min(...units.map((u) => UNIT_DEFS[u.kind].speed));
-  for (const u of units) u.speedCap = u === c ? slowest * (1 + u.speedBonus) : 0;
+  setCommanderPace(sim, b, c, units);
   const size = BUILDING_DEFS[h.kind].size;
   const hx = (h.tx + size / 2) * ts;
   const hy = (h.ty + size / 2) * ts;
@@ -446,9 +462,19 @@ function updateHospitalMarch(sim: Sim, b: Battalion, c: Unit, units: Unit[]): vo
 function applyOrder(sim: Sim, b: Battalion, c: Unit, units: Unit[]): void {
   const o = b.order;
   if (o.type === 'attack') {
+    // Titã longe: o batalhão marcha em formação atrás do comandante; perto, cada um parte para o ataque.
+    const t = sim.titan(o.titanId);
+    const ts = sim.tileSize;
+    const d = t ? Math.hypot(t.x - c.x, t.y - c.y) : 0;
+    const engaged = units.some((u) => u !== c && u.order.type === 'attack');
+    const near = d <= (engaged ? S.engageReleaseTiles : S.engageTiles) * ts;
     for (const u of units) {
-      if (u.order.type !== 'attack' || u.order.titanId !== o.titanId) {
+      const attack = u === c || near;
+      if (attack && (u.order.type !== 'attack' || u.order.titanId !== o.titanId)) {
         u.order = { type: 'attack', titanId: o.titanId };
+        clearPath(u);
+      } else if (!attack && u.order.type !== 'follow') {
+        u.order = { type: 'follow' };
         clearPath(u);
       }
     }

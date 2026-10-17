@@ -300,3 +300,53 @@ describe('save', () => {
     expect(m.battalions[0].formation).toBe('block');
   });
 });
+
+describe('formação em marcha', () => {
+  for (const f of ['circle', 'wedge', 'line', 'block'] as const) {
+    it(`em "${f}", o batalhão chega formado (não vira uma fila atrás do comandante)`, () => {
+      const s = flatGame();
+      setNoon(s);
+      const c = soldier(s, CENTER + 6, CENTER + 6, 60);
+      const ms = Array.from({ length: 8 }, (_, i) => soldier(s, CENTER + 4 + (i % 4), CENTER + 8 + Math.floor(i / 4), 5));
+      const sim = new Sim(s);
+      const b = formBattalion(sim, [c.id, ...ms.map((m) => m.id)]).battalion!;
+      setFormation(sim, b.id, f);
+      b.order = { type: 'move', tx: CENTER + 6, ty: CENTER + 40 };
+      runSeconds(sim, 20);
+      const off = b.memberIds.map((id, i) => {
+        const m = sim.unit(id)!;
+        const slot = formationSlot(sim, b, c, i);
+        return Math.hypot(slot.x - m.x, slot.y - m.y) / TS;
+      });
+      expect(Math.max(...off)).toBeLessThan(1.2);
+      expect(c.y / TS).toBeGreaterThan(CENTER + 15); // e andou de verdade
+    });
+  }
+});
+
+describe('caçada em formação', () => {
+  it('o batalhão marcha em formação até o titã e só se solta para atacar quando perto', () => {
+    const s = flatGame();
+    setNoon(s);
+    const c = soldier(s, CENTER + 6, CENTER + 6, 60);
+    const ms = Array.from({ length: 8 }, (_, i) => soldier(s, CENTER + 4 + (i % 4), CENTER + 8 + Math.floor(i / 4), 5));
+    for (const u of [c, ...ms]) u.hp = 9999;
+    const t = addTitan(s, CENTER + 6, CENTER + 50);
+    t.hp = t.maxHp = 1e6;
+    const sim = new Sim(s);
+    const b = formBattalion(sim, [c.id, ...ms.map((m) => m.id)]).battalion!;
+    setFormation(sim, b.id, 'circle');
+    setMode(sim, b.id, 'hunt');
+    runSeconds(sim, 12);
+    const d = Math.hypot(t.x - c.x, t.y - c.y) / TS;
+    expect(d).toBeGreaterThan(BALANCE.soldiers.engageTiles + 1); // ainda longe: em marcha
+    {
+      expect(ms.every((m) => m.order.type === 'follow')).toBe(true);
+      const off = b.memberIds.map((id, i) => Math.hypot(formationSlot(sim, b, c, i).x - sim.unit(id)!.x, formationSlot(sim, b, c, i).y - sim.unit(id)!.y) / TS);
+      expect(Math.max(...off)).toBeLessThan(1.5);
+    }
+    // Chega perto e todos atacam.
+    runSeconds(sim, 40);
+    expect(ms.every((m) => m.order.type === 'attack')).toBe(true);
+  });
+});

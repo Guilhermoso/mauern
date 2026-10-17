@@ -197,6 +197,12 @@ export const BALANCE = {
     formationSpacing: 20, // px entre soldados na formação
     leadershipPerLevel: 0.005, // bônus de comando: +0,5% de ataque e vida por nível do comandante
     leadershipRadius: 8, // tiles: o bônus só vale perto do comandante
+    formationLooseTiles: 0.8, // algum soldado fora do lugar na formação: o comandante anda a 70%
+    formationLoosePace: 0.7,
+    formationRegroupTiles: 4, // muito fora do lugar: o comandante anda a 35% até reagrupar
+    formationRegroupPace: 0.35,
+    engageTiles: 7, // titã a esta distância do comandante: o batalhão sai da formação e ataca
+    engageReleaseTiles: 12, // já atacando, só volta à formação se o titã se afastar além disto
     formationUnlockLevel: 40, // comandante a partir deste nível escolhe a formação
     huntXpPerLevels: 20, // modo caçar: +1 de experiência por segundo a cada 20 níveis do comandante
   },
