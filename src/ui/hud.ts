@@ -1,12 +1,17 @@
 import { BALANCE } from '../data/balance';
 import { formatClock, getClock } from '../core/time';
 import { populationCap, type GameState } from '../state';
+import type { Sim } from '../core/sim';
+import { foodPerDay, moraleTarget, taxesPerDay, winterWoodPerDay } from '../systems/city';
+import { ERA_NAMES } from '../systems/era';
 import type { ResourceKind } from '../entities/types';
 
 export interface HudActions {
   setSpeed(speed: number): void;
   openMenu(): void;
   selectIdle(): void;
+  openEra(): void;
+  openChronicles(): void;
 }
 
 const RESOURCES: { key: ResourceKind; label: string; color: string }[] = [
@@ -25,6 +30,9 @@ export class Hud {
   private resEls = new Map<ResourceKind, HTMLElement>();
   private popEl!: HTMLElement;
   private idleBtn = document.createElement('button');
+  private moraleEl = document.createElement('div');
+  private eraBtn = document.createElement('button');
+  private resWrap = new Map<ResourceKind, HTMLElement>();
   private seasonEl!: HTMLElement;
   private clockEl!: HTMLElement;
   private threatEl = document.createElement('div');
@@ -43,6 +51,7 @@ export class Hud {
       el.innerHTML = `<span class="chip" style="background:${r.color}"></span><span class="label">${r.label}</span><b>0</b>`;
       this.topbar.appendChild(el);
       this.resEls.set(r.key, el.querySelector('b')!);
+      this.resWrap.set(r.key, el);
     }
     const pop = document.createElement('div');
     pop.className = 'res';
@@ -50,6 +59,9 @@ export class Hud {
     pop.innerHTML = `<span class="chip" style="background:#3a6fd8"></span><span class="label">População</span><b>0</b>`;
     this.popEl = pop.querySelector('b')!;
     this.topbar.appendChild(pop);
+
+    this.moraleEl.className = 'morale';
+    this.topbar.appendChild(this.moraleEl);
 
     this.idleBtn.className = 'idle-btn';
     this.idleBtn.title = 'Selecionar o próximo aldeão ocioso (tecla .)';
@@ -60,15 +72,21 @@ export class Hud {
     spacer.className = 'spacer';
     this.topbar.appendChild(spacer);
 
-    const era = document.createElement('div');
-    era.className = 'era';
-    era.textContent = 'Era I — Refúgio';
+    const era = this.eraBtn;
+    era.className = 'era-link';
+    era.title = 'Caminho para a próxima era';
+    era.onclick = () => this.actions.openEra();
+    const chron = document.createElement('button');
+    chron.className = 'chron-link';
+    chron.textContent = 'Crônicas';
+    chron.title = 'Objetivos opcionais e relíquias';
+    chron.onclick = () => this.actions.openChronicles();
     this.seasonEl = document.createElement('div');
     this.clockEl = document.createElement('div');
     this.clockEl.className = 'clock';
     this.threatEl.className = 'threat';
-    this.threatEl.title = 'Próximo Grande Ataque de titãs';
-    this.topbar.append(era, this.threatEl, this.seasonEl, this.clockEl);
+    this.threatEl.title = 'Próximo Grande Ataque: uma horda de titãs, anunciada na véspera';
+    this.topbar.append(era, chron, this.threatEl, this.seasonEl, this.clockEl);
     this.paused.className = 'paused panel hidden';
     this.paused.textContent = 'PAUSADO — Espaço para continuar';
 
@@ -95,20 +113,38 @@ export class Hud {
     this.toasts.className = 'toasts';
   }
 
-  update(state: GameState): void {
+  update(sim: Sim): void {
+    const state = sim.state;
     for (const r of RESOURCES) this.resEls.get(r.key)!.textContent = String(Math.floor(state.resources[r.key]));
+    this.eraBtn.textContent = ERA_NAMES[state.era];
+    // Dicas com consumo e produção.
+    const fpd = foodPerDay(sim);
+    this.resWrap.get('food')!.title = `Comida — a população consome ${fpd.toFixed(0)} por dia${state.city.starving ? ' (FALTANDO!)' : ''}`;
+    const wpd = winterWoodPerDay(sim);
+    this.resWrap.get('wood')!.title = `Madeira — no inverno as casas queimam ${wpd.toFixed(0)} por dia${state.city.cold ? ' (FALTANDO!)' : ''}`;
+    this.resWrap.get('gold')!.title = `Ouro — impostos: ${taxesPerDay(sim).toFixed(1)} por dia (casas melhores pagam mais)`;
+    const mt = moraleTarget(sim);
+    const m = Math.round(state.morale);
+    this.moraleEl.textContent = `Moral ${m}${mt.target > m + 1 ? ' ▲' : mt.target < m - 1 ? ' ▼' : ''}`;
+    this.moraleEl.classList.toggle('low', m < 35);
+    this.moraleEl.classList.toggle('high', m >= 70);
+    this.moraleEl.title =
+      `Moral ${m} (tende a ${mt.target})\n` +
+      mt.parts.map((p) => `${p.value >= 0 ? '+' : ''}${p.value}  ${p.label}`).join('\n') +
+      `\n\nMoral alta faz todos trabalharem mais rápido.`;
     this.popEl.textContent = `${state.units.length}/${populationCap(state)}`;
     const idle = state.units.filter((u) => u.kind === 'villager' && u.order.type === 'idle').length;
     this.idleBtn.textContent = `Ociosos: ${idle}`;
     this.idleBtn.classList.toggle('has-idle', idle > 0);
     const clock = getClock(state.tick);
-    this.seasonEl.textContent = `${clock.season}, ano ${clock.year}`;
+    this.seasonEl.textContent = clock.season;
+    this.seasonEl.title = `${clock.season}, ano ${clock.year}`;
     this.clockEl.textContent = `Dia ${clock.day} · ${formatClock(clock)}`;
 
     const th = state.threat;
-    this.threatEl.textContent = th.greatAttackAnnounced ? 'Grande Ataque amanhã!' : `Grande Ataque: dia ${th.nextGreatAttackDay}`;
+    this.threatEl.textContent = th.greatAttackAnnounced ? 'Horda amanhã!' : `Horda: dia ${th.nextGreatAttackDay}`;
     this.threatEl.classList.toggle('soon', th.greatAttackAnnounced || th.nextGreatAttackDay === clock.day);
-    if (th.nextGreatAttackDay === clock.day) this.threatEl.textContent = 'Grande Ataque hoje!';
+    if (th.nextGreatAttackDay === clock.day) this.threatEl.textContent = 'Horda hoje!';
 
     if (state.speed !== this.lastSpeed) {
       this.lastSpeed = state.speed;
@@ -143,10 +179,11 @@ export class Hud {
   }
 
   // Notificação passageira. Com onClick, clicar nela leva a câmera ao local do evento.
-  toast(text: string, onClick?: () => void, danger = false): void {
+  toast(text: string, onClick?: () => void, danger = false, good = false): void {
     const t = document.createElement('div');
     t.className = 'toast panel';
     if (danger) t.classList.add('danger');
+    if (good) t.classList.add('good');
     t.textContent = text;
     if (onClick) {
       t.classList.add('clickable');

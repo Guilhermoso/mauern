@@ -6,6 +6,7 @@ import type { Building, Titan, Unit, UnitOrder } from '../entities/types';
 import { clearPath, moveTo, stepToward } from './movement';
 import { ejectGarrison, garrisonCount, killTitan, titanRadius } from './damage';
 import { buildingCenter } from './queries';
+import { flat, unitAttack } from './modifiers';
 
 const TPS = BALANCE.time.ticksPerSecond;
 const DT = 1 / TPS;
@@ -46,7 +47,7 @@ export function updateAttack(sim: Sim, u: Unit, o: AttackOrder): boolean {
     if (u.attackCooldown <= 0) {
       u.attackCooldown = def.attackCooldown;
       sim.fx.push({ type: 'hit', x: t.x, y: t.y });
-      hitTitan(sim, t, def.attack);
+      hitTitan(sim, t, unitAttack(sim.state, u));
     }
     return true;
   }
@@ -105,11 +106,12 @@ export function updateBuildingAttacks(sim: Sim): void {
     const n = garrisonCount(sim, b);
     if (atk.needsGarrison && n === 0) continue;
     const c = buildingCenter(sim, b);
-    const t = nearestTitan(sim, c.x, c.y, atk.range * sim.tileSize);
+    const range = atk.range + (b.kind === 'watchTower' ? flat(sim.state, 'towerRange') : 0);
+    const t = nearestTitan(sim, c.x, c.y, range * sim.tileSize);
     if (!t) continue;
     b.attackCooldown = atk.cooldown;
     sim.fx.push({ type: 'arrow', x: c.x, y: c.y - 10, x2: t.x, y2: t.y });
-    hitTitan(sim, t, atk.damage + atk.damagePerGarrison * n);
+    hitTitan(sim, t, atk.damage + flat(sim.state, 'arrowDamage') + atk.damagePerGarrison * n);
   }
 }
 

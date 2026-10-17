@@ -77,3 +77,10 @@ export function horn(): void {
 export function thud(): void {
   tone(90, 0, 0.35, 'triangle', 0.4, 40);
 }
+
+// Acorde curto e agradável (pesquisa concluída, crônica cumprida, vitória).
+export function chime(): void {
+  tone(660, 0, 0.6, 'sine', 0.25);
+  tone(830, 0.08, 0.6, 'sine', 0.2);
+  tone(990, 0.16, 0.9, 'sine', 0.18);
+}

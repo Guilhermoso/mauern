@@ -7,7 +7,13 @@ import { canAfford, cancelTrain, trainUnit, ungarrison } from '../systems/comman
 import { unitStatus } from '../systems/units';
 import { garrisonCount } from '../systems/damage';
 import { ringAlarm, stopAlarm } from '../systems/combat';
-import type { Unit, UnitKind } from '../entities/types';
+import { availableTechs, cancelResearch, startResearch } from '../systems/research';
+import { TECH_DEFS, type TechId } from '../data/techs';
+import { BALANCE } from '../data/balance';
+import { missingNeeds, serviceRadius } from '../systems/city';
+import { buildingMaxHp, unitMaxHp } from '../systems/modifiers';
+import { housingOf } from '../state';
+import type { Building, Unit, UnitKind } from '../entities/types';
 
 // Painel inferior: informações do que está selecionado e botões de comando.
 // O conteúdo só é reconstruído quando a "estrutura" muda (outra seleção, fila diferente etc.);
@@ -44,7 +50,9 @@ export class BottomPanel {
     }
     if (s.building !== null) {
       const b = this.sim.building(s.building);
-      return b ? `b:${b.id}:${b.built}:${b.queue.length}:${garrisonCount(this.sim, b) > 0}:${this.sim.state.alarm}` : '';
+      return b
+        ? `b:${b.id}:${b.built}:${b.queue.length}:${garrisonCount(this.sim, b) > 0}:${this.sim.state.alarm}:${b.research?.tech ?? ''}:${this.sim.state.techs.length}:${b.level}`
+        : '';
     }
     if (s.node !== null) return `n:${s.node}`;
     if (s.titan !== null) return `t:${s.titan}`;
@@ -83,14 +91,13 @@ export class BottomPanel {
     const units = ids.map((id) => this.sim.unit(id)).filter((u): u is Unit => !!u);
     if (units.length === 1) {
       const u = units[0];
-      const def = UNIT_DEFS[u.kind];
       const title = el('div', 'bp-title', u.name);
       const sub = el('div', 'bp-sub', unitNoun(u.kind, isFemaleName(u.name)));
       const hp = el('div', 'bp-line');
       const status = el('div', 'bp-line');
       this.info.append(title, sub, hp, status);
       this.updaters.push(() => {
-        hp.textContent = `Vida: ${Math.ceil(u.hp)}/${def.maxHp}`;
+        hp.textContent = `Vida: ${Math.ceil(u.hp)}/${unitMaxHp(this.sim.state, u)}`;
         status.textContent = unitStatus(this.sim, u);
       });
     } else {
@@ -119,10 +126,11 @@ export class BottomPanel {
     const b = this.sim.building(id);
     if (!b) return;
     const def = BUILDING_DEFS[b.kind];
-    this.info.append(el('div', 'bp-title', def.name));
+    const title = b.kind === 'house' && b.built ? BALANCE.city.houseLevelNames[b.level - 1] : def.name;
+    this.info.append(el('div', 'bp-title', title));
     const hp = el('div', 'bp-line');
     this.info.append(hp);
-    this.updaters.push(() => (hp.textContent = `Vida: ${Math.ceil(b.hp)}/${def.maxHp}`));
+    this.updaters.push(() => (hp.textContent = `Vida: ${Math.ceil(b.hp)}/${buildingMaxHp(this.sim.state, b)}`));
 
     if (!b.built) {
       const p = el('div', 'bp-line');
@@ -141,7 +149,12 @@ export class BottomPanel {
     this.info.append(el('div', 'bp-sub', def.description));
     const dmg = el('div', 'bp-hint');
     this.info.append(dmg);
-    this.updaters.push(() => (dmg.textContent = b.hp < def.maxHp ? 'Danificado: aldeões podem reparar (botão direito).' : ''));
+    this.updaters.push(() => (dmg.textContent = b.hp < buildingMaxHp(this.sim.state, b) ? 'Danificado: aldeões podem reparar (botão direito).' : ''));
+    if (b.kind === 'house') this.buildHouseInfo(b);
+    if (b.kind === 'well' || b.kind === 'bonfire') {
+      this.info.append(el('div', 'bp-line', `Alcance: ${serviceRadius(this.sim, b.kind)} tiles (círculo no mapa)`));
+    }
+    this.buildResearch(b);
     if (def.garrison > 0) {
       const g = el('div', 'bp-line');
       this.info.append(g);
@@ -212,6 +225,56 @@ export class BottomPanel {
       this.info.append(el('div', 'bp-hint', 'Botão direito no mapa define o ponto de reunião.'));
     }
     if (b.kind !== 'townCenter') this.commands.appendChild(dangerButton('Demolir', 'Del', () => this.sel.deleteSelected()));
+  }
+
+  private buildHouseInfo(b: Building): void {
+    const C = BALANCE.city;
+    this.info.append(el('div', 'bp-line', `Moradores: ${housingOf(b)} · Impostos: ${C.houseTaxPerDay[b.level - 1]} ouro/dia`));
+    const need = el('div', 'bp-hint');
+    this.info.append(need);
+    this.updaters.push(() => {
+      const losing = missingNeeds(this.sim, b, b.level);
+      if (losing.length) {
+        need.textContent = `Faltando: ${losing.join(', ')}. A casa vai regredir se continuar assim.`;
+        return;
+      }
+      if (b.level >= 3) {
+        need.textContent = 'Nível máximo desta era.';
+        return;
+      }
+      const next = missingNeeds(this.sim, b, b.level + 1);
+      if (b.level + 1 === 3 && this.sim.state.resources.stone < C.level3StoneCost) next.push(`${C.level3StoneCost} de pedra`);
+      need.textContent = next.length
+        ? `Para virar ${C.houseLevelNames[b.level].toLowerCase()}: ${next.join(', ')}.`
+        : `Evoluindo para ${C.houseLevelNames[b.level].toLowerCase()}...`;
+    });
+  }
+
+  private buildResearch(b: Building): void {
+    if (b.research) {
+      const tech = TECH_DEFS[b.research.tech as TechId];
+      const line = el('div', 'bp-line bp-research');
+      const bar = progressBar();
+      this.info.append(line, bar.el);
+      const r = b.research;
+      this.updaters.push(() => {
+        line.textContent = `Pesquisando: ${tech.name} (${Math.floor((r.progress / tech.time) * 100)}%)`;
+        bar.set(r.progress / tech.time);
+      });
+      this.commands.appendChild(dangerButton('Cancelar pesquisa', '', () => cancelResearch(this.sim, b.id)));
+      return;
+    }
+    for (const id of availableTechs(this.sim, b)) {
+      const t = TECH_DEFS[id];
+      const days = t.time / BALANCE.time.secondsPerDay;
+      const btn = cmdButton(t.name, formatCost(t.cost), '', `${t.description} Duração: ${days.toFixed(1).replace('.', ',')} dia(s) de jogo.`, () => {
+        const err = startResearch(this.sim, b.id, id);
+        if (err) this.toast(err);
+      });
+      btn.classList.add('tech');
+      this.commands.appendChild(btn);
+      this.updaters.push(() => btn.classList.toggle('disabled', !canAfford(this.sim, t.cost)));
+    }
   }
 
   private buildNode(id: number): void {

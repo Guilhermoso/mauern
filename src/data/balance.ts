@@ -48,6 +48,7 @@ export const BALANCE = {
     heightGrowthPerDay: 0.15, // o tamanho máximo sorteado cresce com os dias (até o teto da era)
     hpPerMeter: 55,
     damagePerMeter: 5,
+    buildingDamageFactor: 0.5, // contra construções os titãs são mais lentos: a ameaça maior é às pessoas
     attackCooldown: 2.2,
     speedBase: 22,
     speedPerMeter: 2,
@@ -62,8 +63,8 @@ export const BALANCE = {
     forestCost: 3,
     greatAttackEveryDays: 7,
     greatAttackBase: 3,
-    greatAttackPerWeek: 2,
-    greatAttackMax: 10,
+    greatAttackPerWeek: 1,
+    greatAttackMaxByEra: [6, 10, 14, 18], // a horda para de crescer num teto definido pela era
     greatAttackHour: 9,
     sightAlertRadius: 30, // tiles de qualquer edifício: avisa que um titã foi avistado
   },
@@ -73,6 +74,54 @@ export const BALANCE = {
     autoAttackRadius: 6, // tiles: milicianos atacam titãs que chegam a essa distância
     repairRateFactor: 0.75, // reparo: fração da velocidade de construção
     alarmRadius: 30, // tiles: aldeões que atendem ao sino
+  },
+  city: {
+    foodPerPersonPerDay: 3.5, // consumo de comida por habitante
+    winterWoodPerHouseLevel: 1.5, // lenha por dia de inverno, por nível de casa
+    houseHousing: [5, 7, 10], // moradores por nível de casa (1 a 3)
+    houseTaxPerDay: [0, 2, 5], // ouro por dia por nível de casa
+    houseLevelNames: ['Barraca', 'Casa de madeira', 'Casa de pedra'],
+    level3StoneCost: 25, // pedra gasta para virar casa de pedra
+    upgradeHours: 2, // horas seguidas com as necessidades atendidas para evoluir
+    downgradeHours: 12, // horas seguidas sem uma necessidade para regredir
+    wellRadius: 7, // alcance do poço, em tiles
+    bonfireRadius: 9,
+    level3Morale: 50, // moral mínima para casas de pedra
+    // Produção das fazendas por estação (primavera, verão, outono, inverno).
+    farmSeasonMultiplier: [1, 1.25, 1.4, 0],
+  },
+  morale: {
+    start: 60,
+    base: 50,
+    changePerHour: 2, // velocidade com que a moral se aproxima do valor-alvo
+    wellFed: 10, // estoque de comida para 2 dias ou mais
+    starving: -30,
+    cold: -20, // sem lenha no inverno
+    perHouseLevel: 7, // por nível médio das casas acima de 1
+    bonfireCoverage: 8, // todas as casas perto de uma fogueira
+    deathPenalty: -4, // por morte, some em 2 dias
+    titanKillBonus: 1, // por titã abatido, some em 1 dia
+    hordeRepelledBonus: 10,
+    modifierCap: 30,
+    workMin: 0.8, // multiplicador de trabalho com moral 0
+    workMax: 1.2, // com moral 100
+  },
+  events: {
+    firstDay: 4,
+    minDaysBetween: 2,
+    maxDaysBetween: 4,
+  },
+  era: {
+    // Marcos para avançar da Era I para a Era II.
+    toVila: {
+      days: 20,
+      population: 30,
+      level2Houses: 10,
+      techs: 8,
+      greatAttacksRepelled: 2,
+      titansKilled: 15,
+      cost: { food: 800, wood: 600, stone: 300 },
+    },
   },
   camera: {
     minZoom: 0.35,

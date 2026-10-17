@@ -50,11 +50,11 @@ export class EntityLayer {
       const def = BUILDING_DEFS[b.kind];
       const p = b.built ? 1 : b.progress / def.buildTime;
       const mask = def.wall || def.gate ? wallMask(sim, b) : 0;
-      const key = `${b.built}|${Math.floor(p * 10)}|${mask}`;
+      const key = `${b.built}|${Math.floor(p * 10)}|${mask}|${b.level}`;
       let v = this.buildings.get(b.id);
       if (!v || v.key !== key) {
         if (v) v.art.root.destroy({ children: true });
-        v = { art: drawBuildingArt(b.kind, b.built, p, mask), key };
+        v = { art: drawBuildingArt(b.kind, b.built, p, mask, b.level), key };
         v.art.root.position.set(b.tx * ts, b.ty * ts);
         this.buildings.set(b.id, v);
         this.container.addChild(v.art.root);
@@ -62,6 +62,12 @@ export class EntityLayer {
       // Fazendas ficam sempre por baixo das unidades.
       v.art.root.zIndex = b.kind === 'farm' ? -1e6 + b.ty : (b.ty + def.size) * ts;
       if (v.art.blades) v.art.blades.rotation = timeSec * 0.6 + b.id;
+      if (v.art.flame) {
+        // Chama que tremula.
+        const f = 1 + Math.sin(timeSec * 13 + b.id) * 0.08 + Math.sin(timeSec * 7.3) * 0.06;
+        v.art.flame.scale.set(f, f * 1.05);
+        v.art.flame.alpha = 0.85 + Math.sin(timeSec * 17) * 0.1;
+      }
     }
     for (const [id, v] of this.buildings) {
       if (!aliveB.has(id)) {

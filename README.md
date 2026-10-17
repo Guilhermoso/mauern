@@ -15,12 +15,20 @@ ficam lentos. A cada 7 dias há um **Grande Ataque**, anunciado na véspera. Cer
 construa torres de vigia, treine milicianos e, no aperto, toque o sino para os aldeões se abrigarem.
 Titãs não abatidos continuam no mundo. Se o Centro da Vila cair, a cidade está perdida.
 
+**A vida na cidade:** cada habitante come todo dia, e no inverno as fazendas param e as casas queimam lenha —
+estoque antes. As casas evoluem (barraca → casa de madeira → casa de pedra) quando têm um poço e uma fogueira
+comunitária por perto e a moral está boa; casas melhores abrigam mais gente e pagam impostos em ouro.
+A **moral** (barra superior; passe o mouse para ver o porquê) acelera ou atrasa todo o trabalho.
+Pesquise tecnologias nos edifícios, cumpra as **Crônicas** para ganhar relíquias e acompanhe no botão da era
+os marcos para evoluir. De tempos em tempos um evento pede uma decisão sua.
+
 | Ação | Controle |
 | --- | --- |
 | Selecionar | Clique esquerdo; arraste para selecionar várias unidades; Shift+clique adiciona |
 | Selecionar todas do mesmo tipo na tela | Duplo clique numa unidade |
 | Dar ordem (andar, coletar, construir, entregar) | Clique direito no destino |
-| Construir (com aldeão selecionado) | Botões do painel ou Q casa · E depósito de madeira · R depósito de mineração · F moinho · G fazenda · T torre de vigia. Shift+clique constrói várias |
+| Construir (com aldeão selecionado) | Botões do painel ou Q casa · V poço · C fogueira · E depósito de madeira · R depósito de mineração · F moinho · G fazenda · T torre de vigia. Shift+clique constrói várias |
+| Pesquisar tecnologias | Selecione o edifício (Centro da Vila, depósitos, moinho, torre) e use os botões azuis |
 | Paliçada (com aldeão selecionado) | Z e arraste para traçar a linha · X portão (pode ser posto sobre a paliçada) |
 | Treinar (Centro da Vila selecionado) | Q aldeão · E miliciano (Shift treina 5) |
 | Atacar um titã | Selecione unidades e clique direito no titã |

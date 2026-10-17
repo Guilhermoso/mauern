@@ -14,7 +14,8 @@ import { EntityLayer } from './render/entityLayer';
 import { Lighting } from './render/lighting';
 import { OverlayLayer } from './render/overlayLayer';
 import { FxLayer } from './render/fxLayer';
-import { bell, horn, setSoundEnabled, soundEnabled, thud, unlockAudioOnGesture } from './audio/sfx';
+import { bell, chime, horn, setSoundEnabled, soundEnabled, thud, unlockAudioOnGesture } from './audio/sfx';
+import { ChroniclesPanel, EraPanel, EventCard } from './ui/panels';
 import type { Alert } from './core/sim';
 import { spawnTitanNear } from './systems/titans';
 import { CameraInput, isTyping } from './input/cameraInput';
@@ -117,7 +118,18 @@ async function boot(): Promise<void> {
   const togglePause = () => setSpeed(state.speed === 0 ? speedBeforePause : 0);
 
   const ui = document.getElementById('ui')!;
-  const hud = new Hud({ setSpeed, openMenu: () => openMenu(), selectIdle: () => selection.selectNextIdle() });
+  const hud = new Hud({
+    setSpeed,
+    openMenu: () => openMenu(),
+    selectIdle: () => selection.selectNextIdle(),
+    openEra: () => eraPanel.open(),
+    openChronicles: () => chroniclesPanel.open(),
+  });
+  const eraPanel = new EraPanel(sim);
+  const chroniclesPanel = new ChroniclesPanel(sim);
+  // Carta de evento: o jogo pausa enquanto ela está aberta.
+  let speedBeforeEvent = -1;
+  const eventCard = new EventCard(sim, (text) => hud.toast(text));
   const selection = new SelectionController(sim, camera, app.canvas, (t) => hud.toast(t));
   const bottom = new BottomPanel(sim, selection, (t) => hud.toast(t));
   const minimap = new Minimap(state, camera);
@@ -189,12 +201,22 @@ async function boot(): Promise<void> {
     gameOver.classList.remove('hidden');
   };
 
-  ui.append(hud.topbar, hud.paused, minimap.el, bottom.el, hud.log, hud.toasts, debug.el, menu.el, gameOver);
+  ui.append(hud.topbar, hud.paused, minimap.el, bottom.el, hud.log, hud.toasts, debug.el, eraPanel.el, chroniclesPanel.el, eventCard.el, menu.el, gameOver);
   if (loadWarning) hud.toast(loadWarning);
 
   // Avisos da simulação: notificação clicável (leva a câmera ao local) e som, sem repetir demais.
   const lastAlert: Partial<Record<Alert['kind'], number>> = {};
-  const throttle: Record<Alert['kind'], number> = { sighted: 6000, underAttack: 15000, greatAttack: 0, death: 2500, destroyed: 4000 };
+  const throttle: Record<Alert['kind'], number> = {
+    sighted: 6000,
+    underAttack: 15000,
+    greatAttack: 0,
+    death: 2500,
+    destroyed: 4000,
+    victory: 0,
+    chronicle: 0,
+    research: 0,
+    event: 0,
+  };
   const handleAlert = (a: Alert) => {
     const now = performance.now();
     if (now - (lastAlert[a.kind] ?? -Infinity) < throttle[a.kind]) return;
@@ -215,6 +237,15 @@ async function boot(): Promise<void> {
         hud.toast(a.text, goTo, true);
         thud();
         break;
+      case 'victory':
+      case 'chronicle':
+      case 'research':
+        hud.toast(a.text, undefined, false, true);
+        chime();
+        break;
+      case 'event':
+        chime();
+        break;
     }
   };
 
@@ -223,6 +254,8 @@ async function boot(): Promise<void> {
     if (e.code === 'Escape') {
       e.preventDefault();
       if (menu.isOpen) menu.close();
+      else if (eraPanel.isOpen) eraPanel.close();
+      else if (chroniclesPanel.isOpen) chroniclesPanel.close();
       else if (!selection.handleKey(e)) openMenu();
       return;
     }
@@ -291,8 +324,20 @@ async function boot(): Promise<void> {
     hudTimer += dtMs;
     if (hudTimer > 200) {
       hudTimer = 0;
-      hud.update(state);
-      hud.setPaused(state.speed === 0 && !menu.isOpen && !isGameOver);
+      hud.update(sim);
+      // Carta de evento aberta: pausa até o jogador escolher.
+      if (eventCard.update()) {
+        if (speedBeforeEvent < 0) {
+          speedBeforeEvent = state.speed || 1;
+          setSpeed(0);
+        }
+      } else if (speedBeforeEvent >= 0) {
+        setSpeed(speedBeforeEvent);
+        speedBeforeEvent = -1;
+      }
+      if (eraPanel.isOpen && hudTimer === 0) eraPanel.render();
+      terrain.setSeason(getClock(state.tick).seasonIndex);
+      hud.setPaused(state.speed === 0 && !menu.isOpen && !isGameOver && !eventCard.isOpen);
       selection.prune();
       bottom.update();
       if (!isGameOver && !state.buildings.some((b) => b.kind === 'townCenter')) showGameOver();
@@ -300,7 +345,8 @@ async function boot(): Promise<void> {
     minimap.draw();
     debug.update();
   });
-  hud.update(state);
+  hud.update(sim);
+  terrain.setSeason(getClock(state.tick).seasonIndex);
 
   // Acesso para testes automatizados (abrir o jogo com ?debug na URL).
   if (new URLSearchParams(location.search).has('debug')) {

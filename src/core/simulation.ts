@@ -5,6 +5,9 @@ import { updateUnits } from '../systems/units';
 import { updateProduction } from '../systems/production';
 import { updateThreat, updateTitans } from '../systems/titans';
 import { updateBuildingAttacks } from '../systems/combat';
+import { updateCity } from '../systems/city';
+import { updateResearch } from '../systems/research';
+import { updateEvents } from '../systems/events';
 
 // Um passo fixo da simulação. Não depende da renderização.
 export function step(sim: Sim): void {
@@ -18,6 +21,9 @@ export function step(sim: Sim): void {
   updateUnits(sim);
   updateTitans(sim);
   updateBuildingAttacks(sim);
+  updateResearch(sim);
+  updateCity(sim);
+  updateEvents(sim);
   sim.syncRng();
 
   if (after.day !== before.day) {

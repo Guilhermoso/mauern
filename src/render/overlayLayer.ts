@@ -5,6 +5,7 @@ import type { Sim } from '../core/sim';
 import type { SelectionController } from '../input/selection';
 import { canAfford, canPlace } from '../systems/commands';
 import { titanRadius } from '../systems/damage';
+import { serviceRadius } from '../systems/city';
 import { drawBuildingArt } from './buildingArt';
 
 // Marcadores de interface no mundo: seleção, barras de vida, progresso de construção,
@@ -28,6 +29,7 @@ export class OverlayLayer {
     g.clear();
     const line = 1.5 / Math.max(zoom, 0.5);
     const s = sel.selection;
+    const pt0 = () => sel.placementTile();
 
     for (const id of s.units) {
       const u = sim.unit(id);
@@ -55,6 +57,25 @@ export class OverlayLayer {
         }
       }
       if (!b.built) bar(g, x + size / 2 - 24, y + size / 2 - 3, 48, b.progress / def.buildTime, 0xe0b43c);
+    }
+
+    // Alcance de poços e fogueiras: aparece ao posicionar casas/poços/fogueiras ou com uma casa selecionada.
+    const selB = s.building !== null ? sim.building(s.building) : undefined;
+    const showCoverage =
+      sel.placing === 'house' || sel.placing === 'well' || sel.placing === 'bonfire' || selB?.kind === 'house' || selB?.kind === 'well' || selB?.kind === 'bonfire';
+    if (showCoverage) {
+      for (const b of sim.state.buildings) {
+        if (b.kind !== 'well' && b.kind !== 'bonfire') continue;
+        const size = BUILDING_DEFS[b.kind].size;
+        const color = b.kind === 'well' ? 0x4fa3ff : 0xff9a3c;
+        under.circle((b.tx + size / 2) * ts, (b.ty + size / 2) * ts, serviceRadius(sim, b.kind) * ts).fill({ color, alpha: 0.07 }).stroke({ width: line, color, alpha: 0.6 });
+      }
+      if ((sel.placing === 'well' || sel.placing === 'bonfire') && pt0()) {
+        const p = pt0()!;
+        const size = BUILDING_DEFS[sel.placing].size;
+        const color = sel.placing === 'well' ? 0x4fa3ff : 0xff9a3c;
+        under.circle((p.tx + size / 2) * ts, (p.ty + size / 2) * ts, serviceRadius(sim, sel.placing) * ts).stroke({ width: line * 1.5, color });
+      }
     }
 
     // Titãs: barra de vida quando feridos ou selecionados.

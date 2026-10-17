@@ -5,6 +5,7 @@ import { newUnit, populationCap } from '../state';
 import { randomName } from '../entities/names';
 import type { Building, Unit } from '../entities/types';
 import { setOrder } from './units';
+import { unitMaxHp } from './modifiers';
 
 const DT = 1 / BALANCE.time.ticksPerSecond;
 
@@ -41,6 +42,7 @@ function spawnUnit(sim: Sim, b: Building, kind: Unit['kind']): Unit {
     }
   }
   const u = newUnit(sim.nextId(), kind, randomName(sim.rng), (best.x + 0.5) * ts, (best.y + 0.5) * ts);
+  u.hp = unitMaxHp(sim.state, u);
   sim.state.units.push(u);
 
   if (b.rally) {

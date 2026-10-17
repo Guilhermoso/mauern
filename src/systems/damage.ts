@@ -3,6 +3,7 @@ import { isFemaleName } from '../entities/names';
 import type { Sim } from '../core/sim';
 import { addLog } from '../state';
 import type { Building, Titan, Unit } from '../entities/types';
+import { BALANCE } from '../data/balance';
 import { clearPath } from './movement';
 
 // Dano, morte e destruição: funções compartilhadas por titãs, combate e comandos do jogador.
@@ -17,6 +18,8 @@ export function killUnit(sim: Sim, u: Unit, cause: [string, string]): void {
   const i = sim.state.units.indexOf(u);
   if (i < 0) return;
   sim.state.units.splice(i, 1);
+  sim.state.stats.deaths++;
+  addMoraleMod(sim, 'Morte de um morador', BALANCE.morale.deathPenalty, 48);
   const f = isFemaleName(u.name);
   const text = `${f ? 'A' : 'O'} ${unitNoun(u.kind, f).toLowerCase()} ${u.name} foi ${f ? cause[1] : cause[0]}.`;
   addLog(sim.state, text);
@@ -92,10 +95,18 @@ export function killTitan(sim: Sim, t: Titan): void {
   const i = sim.state.titans.indexOf(t);
   if (i < 0) return;
   sim.state.titans.splice(i, 1);
+  sim.state.stats.titansKilled++;
+  addMoraleMod(sim, 'Titã abatido', BALANCE.morale.titanKillBonus, 24);
   sim.fx.push({ type: 'steam', x: t.x, y: t.y, size: titanRadius(t.height) });
   addLog(sim.state, `Um titã de ${t.height.toFixed(1).replace('.', ',')} m foi abatido.`);
 }
 
 export function titanRadius(height: number): number {
   return 6 + 3.2 * height;
+}
+
+// Modificador temporário de moral (some depois de algumas horas de jogo).
+export function addMoraleMod(sim: Sim, reason: string, value: number, hours: number): void {
+  const ticksPerHour = (BALANCE.time.ticksPerSecond * BALANCE.time.secondsPerDay) / 24;
+  sim.state.moraleMods.push({ reason, value, expiresTick: sim.state.tick + Math.round(hours * ticksPerHour) });
 }

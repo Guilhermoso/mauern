@@ -6,6 +6,7 @@ import type { Building, BuildingKind, ResourceKind, Unit, UnitKind } from '../en
 import { TILE_INFO } from '../world/terrain';
 import { getTile } from '../world/world';
 import { farmTaken, findNearestNode, isExposed } from './queries';
+import { buildingMaxHp } from './modifiers';
 import { setOrder } from './units';
 import { ejectGarrison, removeBuilding, titanRadius } from './damage';
 
@@ -16,11 +17,11 @@ export function canAfford(sim: Sim, cost: Cost): boolean {
   return (Object.entries(cost) as [ResourceKind, number][]).every(([k, v]) => sim.state.resources[k] >= v);
 }
 
-function pay(sim: Sim, cost: Cost): void {
+export function pay(sim: Sim, cost: Cost): void {
   for (const [k, v] of Object.entries(cost) as [ResourceKind, number][]) sim.state.resources[k] -= v;
 }
 
-function refund(sim: Sim, cost: Cost, fraction = 1): void {
+export function refund(sim: Sim, cost: Cost, fraction = 1): void {
   for (const [k, v] of Object.entries(cost) as [ResourceKind, number][]) sim.state.resources[k] += Math.floor(v * fraction);
 }
 
@@ -170,7 +171,7 @@ export function smartCommand(sim: Sim, ids: readonly number[], wx: number, wy: n
       else commandMove(sim, others, tx, ty);
     }
     if (!builders.length) return null;
-    if (!b.built || b.hp < def.maxHp) commandBuild(sim, bIds, b.id);
+    if (!b.built || b.hp < buildingMaxHp(sim.state, b)) commandBuild(sim, bIds, b.id);
     else if (b.kind === 'farm') commandFarm(sim, bIds, b.id);
     else {
       const carrying = builders.filter((u) => u.carry && def.dropsite.includes(u.carry.kind));

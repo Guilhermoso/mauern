@@ -38,14 +38,14 @@ export const BUILDING_DEFS: Record<BuildingKind, BuildingDef> = {
     name: 'Centro da Vila',
     feminine: false,
     description: 'O coração da cidade. Treina aldeões e recebe todos os recursos.',
-    size: 4, maxHp: 2400, housing: 5, cost: { wood: 275, stone: 100 }, buildTime: 150,
+    size: 4, maxHp: 3000, housing: 5, cost: { wood: 275, stone: 100 }, buildTime: 150,
     dropsite: ['food', 'wood', 'stone', 'iron', 'gold'], walkable: false, trains: ['villager', 'militia'],
     garrison: 15, attack: { damage: 3, cooldown: 2, range: 6, needsGarrison: false, damagePerGarrison: 0.5 },
   },
   house: {
     name: 'Casa',
     feminine: true,
-    description: 'Abriga 5 habitantes.',
+    description: 'Abriga moradores e paga impostos. Evolui com água, fogueira e moral.',
     size: 2, maxHp: 550, housing: 5, cost: { wood: 30 }, buildTime: 15,
     dropsite: [], walkable: false, trains: [], hotkey: 'KeyQ', garrison: 0,
   },
@@ -99,10 +99,24 @@ export const BUILDING_DEFS: Record<BuildingKind, BuildingDef> = {
     dropsite: [], walkable: false, trains: [], hotkey: 'KeyT', garrison: 5,
     attack: { damage: 4, cooldown: 2, range: 7, needsGarrison: false, damagePerGarrison: 1 },
   },
+  well: {
+    name: 'Poço',
+    feminine: false,
+    description: 'Água para as casas por perto. Casas sem água não evoluem.',
+    size: 1, maxHp: 250, housing: 0, cost: { wood: 30, stone: 20 }, buildTime: 15,
+    dropsite: [], walkable: false, trains: [], hotkey: 'KeyV', garrison: 0,
+  },
+  bonfire: {
+    name: 'Fogueira Comunitária',
+    feminine: true,
+    description: 'Ponto de encontro dos moradores. Melhora a moral e permite casas de pedra por perto.',
+    size: 2, maxHp: 300, housing: 0, cost: { wood: 60, stone: 10 }, buildTime: 20,
+    dropsite: [], walkable: false, trains: [], hotkey: 'KeyC', garrison: 0,
+  },
 };
 
 // Ordem dos botões no menu de construção do aldeão.
-export const VILLAGER_BUILDS: BuildingKind[] = ['house', 'lumberCamp', 'miningCamp', 'mill', 'farm', 'palisade', 'gate', 'watchTower'];
+export const VILLAGER_BUILDS: BuildingKind[] = ['house', 'well', 'bonfire', 'lumberCamp', 'miningCamp', 'mill', 'farm', 'palisade', 'gate', 'watchTower'];
 
 export interface UnitDef {
   name: string;

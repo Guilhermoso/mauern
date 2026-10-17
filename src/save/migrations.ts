@@ -48,6 +48,35 @@ const MIGRATIONS: Record<number, Migration> = {
       units: save.units.map((u: any) => ({ ...u, garrison: 0, attackCooldown: 0, prevOrder: null })),
     };
   },
+  // v3 → v4: Era I completa — casas com nível, moral, tecnologias, crônicas, estatísticas e eventos.
+  3: (save) => {
+    const ticksPerDay = 20 * 240;
+    const day = Math.floor((save.tick + (7 * ticksPerDay) / 24) / ticksPerDay) + 1;
+    return {
+      ...save,
+      version: 4,
+      era: 0,
+      techs: [],
+      relics: [],
+      morale: 60,
+      moraleMods: [],
+      stats: {
+        titansKilled: 0,
+        deaths: 0,
+        greatAttacksRepelled: 0,
+        flawlessHordes: 0,
+        hordeDeathsAtStart: -1,
+        gathered: { food: 0, wood: 0, stone: 0, iron: 0, gold: 0 },
+        moraleHighHours: 0,
+        wintersSurvived: 0,
+        wintersWithoutHunger: 0,
+      },
+      city: { starving: false, cold: false, hungerThisWinter: false, taxCarry: 0 },
+      events: { nextDay: day + 2, active: null },
+      buildings: save.buildings.map((b: any) => ({ ...b, level: 1, needHours: 0, missingHours: 0, research: null })),
+      titans: save.titans.map((t: any) => ({ ...t, horde: false })),
+    };
+  },
 };
 
 export function migrate(save: any): GameState {

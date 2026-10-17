@@ -10,6 +10,7 @@ import { PLAYER_COLOR, shade } from './colors';
 export interface BuildingArt {
   root: Container;
   blades?: Graphics;
+  flame?: Graphics;
 }
 
 // Vizinhos de muralha (para os troncos da paliçada se ligarem): bits N, L, S, O, NE, SE, SO, NO.
@@ -17,7 +18,7 @@ export const NEIGHBOR_DIRS = [
   [0, -1], [1, 0], [0, 1], [-1, 0], [1, -1], [1, 1], [-1, 1], [-1, -1],
 ] as const;
 
-export function drawBuildingArt(kind: BuildingKind, built: boolean, progress01: number, mask = 0): BuildingArt {
+export function drawBuildingArt(kind: BuildingKind, built: boolean, progress01: number, mask = 0, level = 1): BuildingArt {
   const ts = BALANCE.world.tileSize;
   const size = BUILDING_DEFS[kind].size * ts;
   const root = new Container();
@@ -36,7 +37,7 @@ export function drawBuildingArt(kind: BuildingKind, built: boolean, progress01: 
     g.rect(2, 2, size - 4, size - 4).stroke({ width: 2, color: 0x5e4a33 });
     root.addChild(g);
     if (kind !== 'farm') {
-      const preview = drawFinished(kind, size);
+      const preview = drawFinished(kind, size, level);
       preview.root.alpha = 0.25 + 0.55 * progress01;
       root.addChild(preview.root);
     }
@@ -51,7 +52,7 @@ export function drawBuildingArt(kind: BuildingKind, built: boolean, progress01: 
     root.addChild(sc);
     return { root };
   }
-  return drawFinished(kind, size);
+  return drawFinished(kind, size, level);
 }
 
 function logRow(g: Graphics, x0: number, y0: number, x1: number, y1: number): void {
@@ -113,7 +114,7 @@ function shadow(g: Graphics, size: number, off = 8): void {
   g.rect(off, off + 2, size, size).fill({ color: 0x000000, alpha: 0.28 });
 }
 
-function drawFinished(kind: BuildingKind, size: number): BuildingArt {
+function drawFinished(kind: BuildingKind, size: number, level = 1): BuildingArt {
   const root = new Container();
   const g = new Graphics();
   root.addChild(g);
@@ -140,20 +141,74 @@ function drawFinished(kind: BuildingKind, size: number): BuildingArt {
       break;
     }
     case 'house': {
+      if (level <= 1) {
+        // Barraca: lona esticada sobre estacas.
+        shadow(g, size - 16, 8);
+        const cloth = 0xc8b48a;
+        g.poly([6, 8, size - 6, 8, size - 6, size / 2]).fill(shade(cloth, 1.08));
+        g.poly([6, 8, 6, size / 2, size - 6, size / 2]).fill(shade(cloth, 1.0));
+        g.poly([6, size / 2, size - 6, size / 2, size - 6, size - 8]).fill(shade(cloth, 0.8));
+        g.poly([6, size / 2, 6, size - 8, size - 6, size - 8]).fill(shade(cloth, 0.86));
+        g.moveTo(6, size / 2).lineTo(size - 6, size / 2).stroke({ width: 2, color: 0x6b4a2a });
+        for (const [x, y] of [[4, 6], [size - 8, 6], [4, size - 10], [size - 8, size - 10]]) g.rect(x, y, 4, 4).fill(0x5a3d22);
+        // Fogueirinha na frente
+        g.circle(size / 2, size - 3, 3).fill(0x4a3a2a);
+        g.circle(size / 2, size - 3, 1.6).fill(0xff9a3c);
+        break;
+      }
+      const stone = level >= 3;
       shadow(g, size - 8, 8);
-      const roof = 0x9c4a2e;
-      g.rect(2, 4, size - 4, size - 8).fill(0x7a5634); // paredes
+      const roof = stone ? 0x4f5866 : 0x9c4a2e;
+      g.rect(2, 4, size - 4, size - 8).fill(stone ? 0x9a948a : 0x7a5634); // paredes
       // Telhado de duas águas com cumeeira horizontal
       g.rect(0, 2, size, size / 2 - 2).fill(shade(roof, 1.12));
       g.rect(0, size / 2, size, size / 2 - 2).fill(shade(roof, 0.78));
-      for (let x = 6; x < size; x += 8) {
+      for (let x = 6; x < size; x += stone ? 6 : 8) {
         g.moveTo(x, 4).lineTo(x, size / 2 - 1).stroke({ width: 1, color: shade(roof, 0.9) });
         g.moveTo(x, size / 2 + 1).lineTo(x, size - 4).stroke({ width: 1, color: shade(roof, 0.6) });
       }
       g.rect(0, size / 2 - 1, size, 2).fill(shade(roof, 0.5));
-      g.rect(size - 18, 8, 7, 7).fill(0x5b544c); // chaminé
-      g.rect(size - 17, 9, 5, 5).fill(0x2e2a26);
+      g.rect(size - 18, 8, stone ? 9 : 7, stone ? 9 : 7).fill(0x5b544c); // chaminé
+      g.rect(size - 17, 9, stone ? 7 : 5, stone ? 7 : 5).fill(0x2e2a26);
+      if (stone) {
+        // Cantos de pedra aparente
+        for (const [x, y] of [[0, 2], [size - 6, 2], [0, size - 8], [size - 6, size - 8]]) g.rect(x, y, 6, 6).fill(0xb3ada2);
+      }
       break;
+    }
+    case 'well': {
+      g.ellipse(18, 20, 13, 9).fill({ color: 0x000000, alpha: 0.25 });
+      g.circle(16, 16, 12).fill(0x8e877b);
+      g.circle(16, 16, 12).stroke({ width: 2, color: 0x6a645a });
+      g.circle(16, 16, 7.5).fill(0x2f5d86);
+      g.circle(14, 14, 2.5).fill({ color: 0xffffff, alpha: 0.35 });
+      // Travessa com balde
+      g.rect(2, 14.5, 28, 3).fill(0x6b4a2a);
+      g.rect(14, 12, 5, 5).fill(0x8b5e34);
+      break;
+    }
+    case 'bonfire': {
+      // Bancos de tronco em volta de uma fogueira de pedras.
+      const c = size / 2;
+      for (let i = 0; i < 4; i++) {
+        const a = (i * Math.PI) / 2 + Math.PI / 4;
+        const x = c + Math.cos(a) * 22;
+        const y = c + Math.sin(a) * 22;
+        g.roundRect(x - 9, y - 3.5, 18, 7, 3).fill(0x7a5230).stroke({ width: 1, color: 0x4a301a });
+      }
+      g.circle(c, c, 12).fill(0x5d5850);
+      for (let i = 0; i < 9; i++) {
+        const a = (i / 9) * Math.PI * 2;
+        g.circle(c + Math.cos(a) * 11, c + Math.sin(a) * 11, 3).fill(0x8e877b);
+      }
+      g.circle(c, c, 7).fill(0x2e2318);
+      const flame = new Graphics();
+      flame.circle(0, 0, 7).fill({ color: 0xff7a1a, alpha: 0.9 });
+      flame.circle(0, -1, 4.5).fill({ color: 0xffc23d, alpha: 0.95 });
+      flame.circle(0, -1.5, 2).fill({ color: 0xfff1b0 });
+      flame.position.set(c, c);
+      root.addChild(flame);
+      return { root, flame };
     }
     case 'lumberCamp': {
       shadow(g, size - 8, 8);

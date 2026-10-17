@@ -1,5 +1,7 @@
 import { BALANCE } from '../data/balance';
-import { BUILDING_DEFS, FARM_GATHER_RATE, NODE_DEFS, UNIT_DEFS, buildingMessage } from '../data/defs';
+import { BUILDING_DEFS, FARM_GATHER_RATE, NODE_DEFS, buildingMessage } from '../data/defs';
+import { buildingMaxHp, carryCapacity, flat, mult, workSpeed } from './modifiers';
+import { getClock } from '../core/time';
 import type { Sim } from '../core/sim';
 import { isFemaleName } from '../entities/names';
 import { addLog } from '../state';
@@ -87,6 +89,7 @@ function deliverTo(sim: Sim, u: Unit, b: Building): 'moving' | 'done' | 'unreach
   if (r === 'moving') return 'moving';
   if (u.carry && BUILDING_DEFS[b.kind].dropsite.includes(u.carry.kind)) {
     sim.state.resources[u.carry.kind] += u.carry.amount;
+    sim.state.stats.gathered[u.carry.kind] += u.carry.amount;
   }
   u.carry = null;
   return 'done';
@@ -106,8 +109,24 @@ function dropPhase(sim: Sim, u: Unit): boolean {
   return r === 'done';
 }
 
+// Velocidade de coleta de um recurso: base × tecnologias/relíquias × moral.
+export function gatherRate(sim: Sim, kind: GatherOrder['nodeKind']): number {
+  const s = sim.state;
+  const res = NODE_DEFS[kind].resource;
+  const bonus = res === 'wood' ? mult(s, 'gatherWood') : res === 'food' ? mult(s, 'gatherFood') : mult(s, 'gatherStone');
+  return NODE_DEFS[kind].gatherRate * bonus * workSpeed(s);
+}
+
+export function farmRate(sim: Sim): number {
+  const s = sim.state;
+  const season = getClock(s.tick).seasonIndex;
+  let seasonMult: number = BALANCE.city.farmSeasonMultiplier[season];
+  if (season === 3) seasonMult = flat(s, 'winterFarm');
+  return FARM_GATHER_RATE * seasonMult * mult(s, 'farm') * workSpeed(s);
+}
+
 function updateGather(sim: Sim, u: Unit, o: GatherOrder): void {
-  const cap = UNIT_DEFS[u.kind].carryCapacity;
+  const cap = carryCapacity(sim.state, u);
   if (o.phase === 'drop') {
     if (dropPhase(sim, u) && u.order === o) {
       o.phase = 'collect';
@@ -156,7 +175,7 @@ function updateGather(sim: Sim, u: Unit, o: GatherOrder): void {
 
   const ts = sim.tileSize;
   face(u, (node.tx + 0.5) * ts, (node.ty + 0.5) * ts);
-  u.work += NODE_DEFS[node.kind].gatherRate * DT;
+  u.work += gatherRate(sim, node.kind) * DT;
   while (u.work >= 1) {
     u.work -= 1;
     if (!u.carry) u.carry = { kind: resource, amount: 0 };
@@ -176,7 +195,7 @@ function updateGather(sim: Sim, u: Unit, o: GatherOrder): void {
 }
 
 function updateFarm(sim: Sim, u: Unit, o: FarmOrder): void {
-  const cap = UNIT_DEFS[u.kind].carryCapacity;
+  const cap = carryCapacity(sim.state, u);
   if (o.phase === 'drop') {
     if (dropPhase(sim, u) && u.order === o) {
       o.phase = 'collect';
@@ -211,7 +230,7 @@ function updateFarm(sim: Sim, u: Unit, o: FarmOrder): void {
   }
   if (r === 'moving') return;
   u.moving = false;
-  u.work += FARM_GATHER_RATE * DT;
+  u.work += farmRate(sim) * DT;
   while (u.work >= 1) {
     u.work -= 1;
     if (!u.carry) u.carry = { kind: 'food', amount: 0 };
@@ -230,7 +249,9 @@ function updateBuild(sim: Sim, u: Unit, buildingId: number): void {
     return;
   }
   const def = BUILDING_DEFS[b.kind];
-  if (b.built && b.hp >= def.maxHp) {
+  const maxHp = buildingMaxHp(sim.state, b);
+  const speed = mult(sim.state, 'build') * workSpeed(sim.state);
+  if (b.built && b.hp >= maxHp) {
     afterBuilding(sim, u, b);
     return;
   }
@@ -244,18 +265,18 @@ function updateBuild(sim: Sim, u: Unit, buildingId: number): void {
   face(u, c.x, c.y);
   if (b.built) {
     // Reparo: devolve a vida aos poucos, sem custo.
-    b.hp = Math.min(def.maxHp, b.hp + (def.maxHp / def.buildTime) * BALANCE.combat.repairRateFactor * DT);
+    b.hp = Math.min(maxHp, b.hp + (maxHp / def.buildTime) * BALANCE.combat.repairRateFactor * speed * DT);
     return;
   }
-  b.progress = Math.min(def.buildTime, b.progress + DT);
-  b.hp = Math.max(1, Math.round(def.maxHp * (b.progress / def.buildTime)));
+  b.progress = Math.min(def.buildTime, b.progress + DT * speed);
+  b.hp = Math.max(1, Math.round(maxHp * (b.progress / def.buildTime)));
   if (b.progress >= def.buildTime) completeBuilding(sim, b);
 }
 
 export function completeBuilding(sim: Sim, b: Building): void {
   b.built = true;
   const def = BUILDING_DEFS[b.kind];
-  b.hp = def.maxHp;
+  b.hp = buildingMaxHp(sim.state, b);
   // Segmentos de muralha não vão para o diário, um por um.
   if (!def.wall) addLog(sim.state, buildingMessage(def, 'concluído', 'concluída'));
 }
@@ -316,7 +337,8 @@ export function unitStatus(sim: Sim, u: Unit): string {
       return `${u.moving ? 'Indo até' : 'Coletando'} ${name}${carrying}`;
     }
     case 'farm':
-      return o.phase === 'drop' ? `Levando comida ao depósito${carrying}` : `Trabalhando na fazenda${carrying}`;
+      if (o.phase === 'drop') return `Levando comida ao depósito${carrying}`;
+      return farmRate(sim) === 0 ? 'Inverno: a terra está congelada' : `Trabalhando na fazenda${carrying}`;
     case 'build': {
       const b = sim.building(o.buildingId);
       if (!b) return 'Construindo';

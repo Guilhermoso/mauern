@@ -24,7 +24,9 @@ export type BuildingKind =
   | 'farm'
   | 'palisade'
   | 'gate'
-  | 'watchTower';
+  | 'watchTower'
+  | 'well'
+  | 'bonfire';
 
 export interface TrainItem {
   kind: UnitKind;
@@ -49,6 +51,10 @@ export interface Building {
   rally: RallyPoint | null;
   farmerId: number; // fazendas: aldeão que trabalha nela (0 = nenhum)
   attackCooldown: number; // segundos até a próxima flecha
+  level: number; // casas: 1 a 3
+  needHours: number; // casas: horas seguidas com as necessidades do próximo nível atendidas
+  missingHours: number; // casas: horas seguidas sem as necessidades do nível atual
+  research: { tech: string; progress: number } | null;
 }
 
 export type UnitKind = 'villager' | 'scout' | 'militia';
@@ -112,6 +118,7 @@ export interface Titan {
   lastHitTick: number; // para o efeito visual de dano
   sighted: boolean; // já foi anunciado ao jogador
   skin: number; // variação de cor
+  horde: boolean; // faz parte de um Grande Ataque
 }
 
 export interface ThreatState {
@@ -119,4 +126,34 @@ export interface ThreatState {
   nextGreatAttackDay: number;
   greatAttackAnnounced: boolean;
   greatAttackDir: number; // ângulo de onde vem a horda
+}
+
+export interface MoraleModifier {
+  reason: string;
+  value: number;
+  expiresTick: number;
+}
+
+export interface Stats {
+  titansKilled: number;
+  deaths: number;
+  greatAttacksRepelled: number;
+  flawlessHordes: number;
+  hordeDeathsAtStart: number; // mortes contadas quando a horda atual chegou (-1 = sem horda)
+  gathered: Resources;
+  moraleHighHours: number;
+  wintersSurvived: number;
+  wintersWithoutHunger: number;
+}
+
+export interface CityState {
+  starving: boolean; // faltou comida na última hora
+  cold: boolean; // faltou lenha na última hora de inverno
+  hungerThisWinter: boolean;
+  taxCarry: number; // frações de ouro acumuladas
+}
+
+export interface EventState {
+  nextDay: number;
+  active: { id: string; data: Record<string, number> } | null;
 }

@@ -13,9 +13,8 @@ const TPS = BALANCE.time.ticksPerSecond;
 const DT = 1 / TPS;
 const TICKS_PER_HOUR = ticksPerDay() / 24;
 
-// Era atual (0 = Era I). O sistema de eras chega na etapa 4.
-function eraIndex(): number {
-  return 0;
+function eraIndex(sim: Sim): number {
+  return Math.min(sim.state.era, T.maxHeightByEra.length - 1);
 }
 
 export function isDaytime(tick: number): boolean {
@@ -35,7 +34,7 @@ export function titanStats(height: number) {
 // --- Surgimento e agendamento da ameaça ---
 
 function rollHeight(sim: Sim, day: number, bias = 1): number {
-  const cap = T.maxHeightByEra[eraIndex()];
+  const cap = T.maxHeightByEra[eraIndex(sim)];
   const max = Math.min(cap, T.minHeight + T.heightGrowthPerDay * day);
   const h = T.minHeight + Math.pow(sim.rng.next(), bias) * (max - T.minHeight);
   return Math.round(h * 10) / 10;
@@ -96,6 +95,7 @@ export function spawnTitan(sim: Sim, height: number, angle?: number, at?: { tx: 
     lastHitTick: -1000,
     sighted: false,
     skin: sim.rng.next(),
+    horde: false,
   };
   sim.state.titans.push(t);
   return t;
@@ -140,8 +140,12 @@ export function updateThreat(sim: Sim): void {
   if (clock.day === th.nextGreatAttackDay && clock.hour >= T.greatAttackHour) {
     if (!th.greatAttackAnnounced) th.greatAttackDir = sim.rng.range(0, Math.PI * 2);
     const week = Math.floor(clock.day / T.greatAttackEveryDays);
-    const n = Math.min(T.greatAttackMax, T.greatAttackBase + T.greatAttackPerWeek * (week - 1));
-    for (let i = 0; i < n; i++) spawnTitan(sim, rollHeight(sim, clock.day + 3, 0.7), th.greatAttackDir + sim.rng.range(-0.35, 0.35));
+    const n = Math.min(T.greatAttackMaxByEra[eraIndex(sim)], T.greatAttackBase + T.greatAttackPerWeek * (week - 1));
+    for (let i = 0; i < n; i++) {
+      const t = spawnTitan(sim, rollHeight(sim, clock.day + 3, 0.7), th.greatAttackDir + sim.rng.range(-0.35, 0.35));
+      if (t) t.horde = true;
+    }
+    state.stats.hordeDeathsAtStart = state.stats.deaths;
     addLog(state, `A horda chegou: ${n} titãs avançam do ${directionName(th.greatAttackDir)}!`);
     th.nextGreatAttackDay += T.greatAttackEveryDays;
     th.greatAttackAnnounced = false;
@@ -261,7 +265,7 @@ export function updateTitans(sim: Sim): void {
     } else if (t.targetKind === 'building' || t.targetKind === 'march') {
       const b = sim.building(t.targetId)!;
       if (distToBuilding(sim, t.x, t.y, b) <= st.radius * 0.5 + 14) {
-        attackBuilding(sim, t, b, st.damage);
+        attackBuilding(sim, t, b, st.damage * T.buildingDamageFactor);
         continue;
       }
       const s = BUILDING_DEFS[b.kind].size;
@@ -279,7 +283,7 @@ export function updateTitans(sim: Sim): void {
       const nty = Math.floor(ny / ts);
       if (sim.nav.isTerrainWalkable(ntx, nty)) {
         const blocker = structureAt(sim, ntx, nty);
-        if (blocker) attackOrApproach(sim, t, blocker, st.damage, speed);
+        if (blocker) attackOrApproach(sim, t, blocker, st.damage * T.buildingDamageFactor, speed);
         else stepToward(t, targetX, targetY, speed);
         continue;
       }
@@ -303,7 +307,7 @@ export function updateTitans(sim: Sim): void {
     const ny = (next - nx) / w;
     const blocker = structureAt(sim, nx, ny);
     if (blocker) {
-      attackOrApproach(sim, t, blocker, st.damage, speed);
+      attackOrApproach(sim, t, blocker, st.damage * T.buildingDamageFactor, speed);
       continue;
     }
     t.facing = Math.atan2((ny + 0.5) * ts - t.y, (nx + 0.5) * ts - t.x);

@@ -4,7 +4,7 @@ import { hash2 } from '../core/rng';
 import { TILE_INFO, Tile } from '../world/terrain';
 import { getTile, type World } from '../world/world';
 import type { ResourceNode } from '../entities/types';
-import { shade } from './colors';
+import { lerpColor, shade } from './colors';
 
 // O terreno é dividido em blocos (chunks). Cada bloco é desenhado uma vez, sob demanda,
 // e "assado" em texturas: uma para o chão e outra (com margem) para árvores e jazidas,
@@ -31,6 +31,7 @@ export class TerrainLayer {
   private cols: number;
   private rows: number;
   private frame = 0;
+  private season = 0;
 
   constructor(private world: World, private seed: number, private renderer: Renderer) {
     this.cols = Math.ceil(world.width / CHUNK);
@@ -45,6 +46,13 @@ export class TerrainLayer {
       const ci = Math.floor(n.ty / CHUNK) * this.cols + Math.floor(n.tx / CHUNK);
       this.nodesByChunk[ci].push(n);
     }
+  }
+
+  // Troca a estação: todos os blocos são redesenhados com as cores novas.
+  setSeason(season: number): void {
+    if (season === this.season) return;
+    this.season = season;
+    for (const i of [...this.chunks.keys()]) this.dropChunk(i);
   }
 
   // Redesenha os blocos onde o terreno ou os recursos mudaram.
@@ -124,7 +132,7 @@ export class TerrainLayer {
         const tile = getTile(this.world, tx, ty);
         const h = hash2(tx, ty, this.seed);
         const base = TILE_INFO[tile].color;
-        ground.rect(tx * ts, ty * ts, ts, ts).fill(shade(base, 0.97 + h * 0.06));
+        ground.rect(tx * ts, ty * ts, ts, ts).fill(seasonalGround(shade(base, 0.97 + h * 0.06), tile, this.season, h));
         this.drawTileDetail(details, tile, tx, ty, h);
       }
     }
@@ -134,7 +142,7 @@ export class TerrainLayer {
     const nodes = new Graphics();
     // Desenha de cima para baixo para que as copas se sobreponham corretamente.
     const sorted = [...this.nodesByChunk[cy * this.cols + cx]].sort((a, b) => a.ty - b.ty || a.tx - b.tx);
-    for (const n of sorted) drawResourceNode(nodes, n);
+    for (const n of sorted) drawResourceNode(nodes, n, this.season);
     objectContent.addChild(nodes);
 
     const chunk: Chunk = {
@@ -154,8 +162,13 @@ export class TerrainLayer {
     const h2 = hash2(tx, ty, this.seed + 99);
     switch (tile) {
       case Tile.Grass:
+        if (this.season === 3) {
+          // Inverno: em vez de tufos verdes, montinhos de neve.
+          if (h > 0.7) g.circle(px + h2 * 24 + 4, py + h * 20 + 6, 2.5).fill(0xffffff);
+          break;
+        }
         if (h > 0.55) {
-          const c = shade(TILE_INFO[Tile.Grass].color, 1.18);
+          const c = this.season === 2 ? 0xb9a650 : shade(TILE_INFO[Tile.Grass].color, 1.18);
           g.rect(px + h2 * 24 + 2, py + h * 20 + 4, 2, 5).fill(c);
           g.rect(px + h2 * 24 + 5, py + h * 20 + 6, 2, 4).fill(c);
         }
@@ -185,7 +198,22 @@ export class TerrainLayer {
   }
 }
 
-export function drawResourceNode(g: Graphics, n: ResourceNode): void {
+// Cores do chão conforme a estação: verão mais vivo, outono amarelado, inverno com neve.
+function seasonalGround(color: number, tile: Tile, season: number, h: number): number {
+  const land = tile === Tile.Grass || tile === Tile.Dirt || tile === Tile.Forest || tile === Tile.Sand;
+  if (season === 1 && tile === Tile.Grass) return lerpColor(color, 0x7aa83e, 0.25);
+  if (season === 2 && (tile === Tile.Grass || tile === Tile.Forest)) return lerpColor(color, 0xa8963f, 0.35 + h * 0.1);
+  if (season === 3) {
+    if (land) return lerpColor(color, 0xeef2f6, 0.72 + h * 0.08);
+    if (tile === Tile.Water) return lerpColor(color, 0xa9c6dc, 0.45);
+    if (tile === Tile.Rock) return lerpColor(color, 0xdfe5ea, 0.35);
+  }
+  return color;
+}
+
+const AUTUMN_LEAVES = [0xb5562a, 0xc98a2c, 0x9c3f24, 0xb8a03a];
+
+export function drawResourceNode(g: Graphics, n: ResourceNode, season = 0): void {
   const ts = BALANCE.world.tileSize;
   const v = n.variant;
   const cx = n.tx * ts + ts / 2 + (v - 0.5) * 8;
@@ -194,10 +222,20 @@ export function drawResourceNode(g: Graphics, n: ResourceNode): void {
     case 'tree': {
       const r = 12 + v * 6;
       g.ellipse(cx + 5, cy + 6, r, r * 0.8).fill({ color: 0x000000, alpha: 0.25 });
-      const dark = v > 0.5 ? 0x2c5a24 : 0x2f6129;
+      let dark = v > 0.5 ? 0x2c5a24 : 0x2f6129;
+      // Algumas árvores são pinheiros (sempre verdes); as outras mudam no outono e perdem folhas no inverno.
+      const evergreen = v < 0.35;
+      if (!evergreen && season === 2) dark = AUTUMN_LEAVES[Math.floor(v * 97) % AUTUMN_LEAVES.length];
+      if (!evergreen && season === 3) dark = 0x6b5a48;
+      if (season === 1 && !evergreen) dark = shade(dark, 1.08);
       g.circle(cx, cy, r).fill(dark);
       g.circle(cx - r * 0.25, cy - r * 0.25, r * 0.65).fill(shade(dark, 1.25));
       g.circle(cx - r * 0.4, cy - r * 0.4, r * 0.3).fill(shade(dark, 1.5));
+      if (season === 3) {
+        // Neve nas copas.
+        g.circle(cx - r * 0.3, cy - r * 0.3, r * 0.55).fill({ color: 0xf4f7fa, alpha: 0.85 });
+        g.circle(cx + r * 0.25, cy - r * 0.1, r * 0.3).fill({ color: 0xf4f7fa, alpha: 0.7 });
+      }
       break;
     }
     case 'berries': {

@@ -2,11 +2,23 @@ import { BALANCE } from './data/balance';
 import { Rng, hashString } from './core/rng';
 import { generateWorld } from './world/generate';
 import type { World } from './world/world';
-import type { Building, BuildingKind, Resources, ThreatState, Titan, Unit, UnitKind } from './entities/types';
+import type {
+  Building,
+  BuildingKind,
+  CityState,
+  EventState,
+  MoraleModifier,
+  Resources,
+  Stats,
+  ThreatState,
+  Titan,
+  Unit,
+  UnitKind,
+} from './entities/types';
 import { BUILDING_DEFS, UNIT_DEFS } from './data/defs';
 import { randomName } from './entities/names';
 
-export const SAVE_VERSION = 3;
+export const SAVE_VERSION = 4;
 
 export interface LogEntry {
   tick: number;
@@ -33,6 +45,14 @@ export interface GameState {
   titans: Titan[];
   threat: ThreatState;
   alarm: boolean; // sino de alarme tocando: aldeões abrigados
+  era: number; // 0 = Era I (Refúgio)
+  techs: string[]; // tecnologias pesquisadas
+  relics: string[]; // crônicas cumpridas (cada uma dá uma relíquia)
+  morale: number; // 0 a 100
+  moraleMods: MoraleModifier[];
+  stats: Stats;
+  city: CityState;
+  events: EventState;
   nextId: number;
   camera: CameraState;
   log: LogEntry[];
@@ -76,6 +96,14 @@ export function createNewGame(seed: string): GameState {
     titans: [],
     threat: newThreat(),
     alarm: false,
+    era: 0,
+    techs: [],
+    relics: [],
+    morale: BALANCE.morale.start,
+    moraleMods: [],
+    stats: newStats(),
+    city: { starving: false, cold: false, hungerThisWinter: false, taxCarry: 0 },
+    events: { nextDay: BALANCE.events.firstDay, active: null },
     nextId,
     camera: { x: centerX, y: centerY, zoom: 1 },
     log: [{ tick: 0, text: 'Um pequeno grupo de sobreviventes funda um refúgio. Que estas terras nos protejam.' }],
@@ -93,6 +121,24 @@ export function newBuilding(id: number, kind: BuildingKind, tx: number, ty: numb
     rally: null,
     farmerId: 0,
     attackCooldown: 0,
+    level: 1,
+    needHours: 0,
+    missingHours: 0,
+    research: null,
+  };
+}
+
+export function newStats(): Stats {
+  return {
+    titansKilled: 0,
+    deaths: 0,
+    greatAttacksRepelled: 0,
+    flawlessHordes: 0,
+    hordeDeathsAtStart: -1,
+    gathered: { food: 0, wood: 0, stone: 0, iron: 0, gold: 0 },
+    moraleHighHours: 0,
+    wintersSurvived: 0,
+    wintersWithoutHunger: 0,
   };
 }
 
@@ -126,8 +172,14 @@ export function newUnit(id: number, kind: UnitKind, name: string, x: number, y: 
   };
 }
 
+export function housingOf(b: Building): number {
+  if (!b.built) return 0;
+  if (b.kind === 'house') return BALANCE.city.houseHousing[b.level - 1] ?? 0;
+  return BUILDING_DEFS[b.kind].housing;
+}
+
 export function populationCap(state: GameState): number {
-  const cap = state.buildings.reduce((sum, b) => sum + (b.built ? BUILDING_DEFS[b.kind].housing : 0), 0);
+  const cap = state.buildings.reduce((sum, b) => sum + housingOf(b), 0);
   return Math.min(cap, BALANCE.population.max);
 }
 
