@@ -266,7 +266,7 @@ export class SelectionController {
       if (this.lastClick.id === unitId && now - this.lastClick.time < 350) {
         const v = this.camera.viewRect();
         const same = this.sim.state.units
-          .filter((u) => u.kind === unit.kind && u.x >= v.x && u.x <= v.x + v.w && u.y >= v.y && u.y <= v.y + v.h)
+          .filter((u) => u.kind === unit.kind && !u.garrison && u.x >= v.x && u.x <= v.x + v.w && u.y >= v.y && u.y <= v.y + v.h)
           .map((u) => u.id);
         this.setSelection({ units: same });
       } else if (additive && (this.selection.units.length || this.selection.battalions.length)) {
@@ -308,7 +308,10 @@ export class SelectionController {
   private boxSelect(rect: { x: number; y: number; w: number; h: number }, additive: boolean): void {
     const a = this.camera.screenToWorld(rect.x, rect.y);
     const b = this.camera.screenToWorld(rect.x + rect.w, rect.y + rect.h);
-    const inside = this.sim.state.units.filter((u) => !u.garrison && u.x >= a.x && u.x <= b.x && u.y >= a.y && u.y <= b.y).map((u) => u.id);
+    let insideUnits = this.sim.state.units.filter((u) => !u.garrison && u.x >= a.x && u.x <= b.x && u.y >= a.y && u.y <= b.y);
+    // Com alguma unidade militar na caixa, só as militares são selecionadas (aldeões ficam de fora).
+    if (insideUnits.some((u) => UNIT_DEFS[u.kind].military)) insideUnits = insideUnits.filter((u) => UNIT_DEFS[u.kind].military);
+    const inside = insideUnits.map((u) => u.id);
     if (additive) {
       this.setSelection({ units: [...new Set([...this.selection.units, ...inside])], battalions: this.selection.battalions });
     } else if (inside.length) {

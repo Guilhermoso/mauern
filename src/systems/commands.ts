@@ -8,6 +8,7 @@ import { getTile } from '../world/world';
 import { farmTaken, findNearestNode, isExposed } from './queries';
 import { buildingMaxHp } from './modifiers';
 import { commandTrain } from './soldiers';
+import { commandHospital } from './hospital';
 import { setOrder } from './units';
 import { ejectGarrison, removeBuilding, titanRadius } from './damage';
 
@@ -169,13 +170,18 @@ export function smartCommand(sim: Sim, ids: readonly number[], wx: number, wy: n
     const bIds = builders.map((u) => u.id);
     // Militares: treinam no campo de treinamento, abrigam-se em torres e no Centro da Vila; senão, só andam até lá.
     if (others.length) {
-      if (b.built && b.kind === 'trainingGround') {
+      if (b.built && def.hospital) {
+        const err = commandHospital(sim, others, b.id);
+        if (err) return err;
+      } else if (b.built && b.kind === 'trainingGround') {
         const err = commandTrain(sim, others, b.id);
         if (err) return err;
       } else if (b.built && def.garrison > 0) commandGarrison(sim, others, b.id);
       else commandMove(sim, others, tx, ty);
     }
     if (!builders.length) return null;
+    // Hospital pronto e inteiro: aldeões viram médicos.
+    if (b.built && def.hospital && b.hp >= buildingMaxHp(sim.state, b)) return commandHospital(sim, bIds, b.id);
     if (!b.built || b.hp < buildingMaxHp(sim.state, b)) commandBuild(sim, bIds, b.id);
     else if (b.kind === 'farm') commandFarm(sim, bIds, b.id);
     else {

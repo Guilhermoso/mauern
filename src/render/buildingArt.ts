@@ -176,6 +176,21 @@ function drawFinished(kind: BuildingKind, size: number, level = 1): BuildingArt 
       }
       break;
     }
+    case 'hospital': {
+      // Pavilhão de pedra clara com telhado de duas águas e uma cruz vermelha.
+      shadow(g, size - 8, 8);
+      g.rect(2, 4, size - 4, size - 8).fill(0xd8d2c4);
+      const roof = 0x8c4a3a;
+      g.rect(0, 2, size, size / 2 - 2).fill(shade(roof, 1.12));
+      g.rect(0, size / 2, size, size / 2 - 2).fill(shade(roof, 0.8));
+      g.rect(0, size / 2 - 1, size, 2).fill(shade(roof, 0.5));
+      const cx = size / 2;
+      const cy = size / 2;
+      g.circle(cx, cy, 14).fill(0xf4f1ea).stroke({ width: 1.5, color: 0x9a948a });
+      g.rect(cx - 3, cy - 9, 6, 18).fill(0xc8283c);
+      g.rect(cx - 9, cy - 3, 18, 6).fill(0xc8283c);
+      break;
+    }
     case 'refuge': {
       // Paliçada fechada com um galpão coberto e uma bandeira branca no mastro.
       shadow(g, size - 8, 8);

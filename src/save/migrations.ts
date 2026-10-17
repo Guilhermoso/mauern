@@ -97,6 +97,13 @@ const MIGRATIONS: Record<number, Migration> = {
     })),
     units: save.units.map((u: any) => ({ ...u, terror: 0 })),
   }),
+  // v6 → v7: hospital de milícia e estado crítico dos batalhões.
+  6: (save) => ({
+    ...save,
+    version: 7,
+    buildings: save.buildings.map((b: any) => ({ ...b, doctorIds: [], upgradeProgress: -1 })),
+    battalions: save.battalions.map((b: any) => ({ ...b, criticalIds: [b.commanderId], autoHospital: true, inHospital: 0 })),
+  }),
 };
 
 export function migrate(save: any): GameState {

@@ -18,7 +18,8 @@ import { buildingMaxHp, unitMaxHp } from '../systems/modifiers';
 import { housingOf } from '../state';
 import { rankName, xpToNext, MAX_LEVEL } from '../data/ranks';
 import { isSoldier, setTrainer, trainees, trainer, trainingRate, dismissTraining } from '../systems/soldiers';
-import { battalionCapacity, battalionOf, battalionUnits, disbandBattalion, setCommander, setMode } from '../systems/battalions';
+import { battalionCapacity, battalionOf, battalionUnits, disbandBattalion, setAutoHospital, setCommander, setMode, toggleCritical } from '../systems/battalions';
+import { dismissDoctors, doctors, hospitalBeds, patients, startHospitalUpgrade, upgradeCost, upgradeTime } from '../systems/hospital';
 import { unitAttack } from '../systems/modifiers';
 import type { Building, Unit, UnitKind } from '../entities/types';
 
@@ -53,7 +54,7 @@ export class BottomPanel {
     const s = this.sel.selection;
     if (s.battalions.length === 1 && !s.units.length) {
       const b = battalionOf(this.sim, s.battalions[0]);
-      return b ? `bat:${b.id}:${b.commanderId}:${b.memberIds.join(',')}:${b.mode}` : '';
+      return b ? `bat:${b.id}:${b.commanderId}:${b.memberIds.join(',')}:${b.mode}:${b.autoHospital}` : '';
     }
     if (s.battalions.length) return `bats:${s.battalions.join(',')}:${s.units.join(',')}`;
     if (s.units.length) {
@@ -63,7 +64,7 @@ export class BottomPanel {
     if (s.building !== null) {
       const b = this.sim.building(s.building);
       return b
-        ? `b:${b.id}:${b.built}:${b.queue.map((q) => q.count).join('.')}:${garrisonCount(this.sim, b) > 0}:${this.sim.state.alarm}:${b.research?.tech ?? ''}:${this.sim.state.techs.length}:${b.level}:${b.trainerId}:${b.guardId}:${b.kind === 'trainingGround' ? trainees(this.sim, b).map((u) => u.id).join(',') : ''}`
+        ? `b:${b.id}:${b.built}:${b.queue.map((q) => q.count).join('.')}:${garrisonCount(this.sim, b) > 0}:${this.sim.state.alarm}:${b.research?.tech ?? ''}:${this.sim.state.techs.length}:${b.level}:${b.trainerId}:${b.guardId}:${b.doctorIds.length}:${b.upgradeProgress >= 0}:${b.kind === 'hospital' ? patients(this.sim, b).map((u) => u.id).join(',') : ''}:${b.kind === 'trainingGround' ? trainees(this.sim, b).map((u) => u.id).join(',') : ''}`
         : '';
     }
     if (s.node !== null) return `n:${s.node}`;
@@ -180,6 +181,7 @@ export class BottomPanel {
     this.updaters.push(() => (dmg.textContent = b.hp < buildingMaxHp(this.sim.state, b) ? 'Danificado: aldeões podem reparar (botão direito).' : ''));
     if (b.kind === 'house') this.buildHouseInfo(b);
     if (b.kind === 'trainingGround') this.buildTrainingGround(b);
+    if (b.kind === 'hospital') this.buildHospital(b);
     if (b.kind === 'well' || b.kind === 'bonfire') {
       this.info.append(el('div', 'bp-line', `Alcance: ${serviceRadius(this.sim, b.kind)} tiles (círculo no mapa)`));
     }
@@ -303,7 +305,10 @@ export class BottomPanel {
       size.textContent = `Soldados: ${b.memberIds.length}/${cmd ? battalionCapacity(cmd.level) : 0} (+ comandante)`;
       const o = b.order;
       const modeText = { manual: 'Sob seu comando', defend: 'Defendendo a posição', hunt: 'Caçando titãs' }[b.mode];
-      status.textContent = `${modeText} — ${o.type === 'attack' ? 'em combate' : o.type === 'move' ? 'em marcha' : 'parado'}`;
+      if (b.inHospital) status.textContent = 'Internado no hospital';
+      else if (o.type === 'hospital') status.textContent = 'Recuando para o hospital';
+      else status.textContent = `${modeText} — ${o.type === 'attack' ? 'em combate' : o.type === 'move' ? 'em marcha' : 'parado'}`;
+      status.classList.toggle('warn', !!b.inHospital || o.type === 'hospital');
     });
     this.info.append(el('div', 'bp-hint', 'Clique direito: mover ou atacar (volta ao modo manual). Subir o comandante de nível abre mais vagas.'));
 
@@ -319,17 +324,91 @@ export class BottomPanel {
     }
     this.commands.appendChild(dangerButton('Desfazer batalhão', '', () => disbandBattalion(this.sim, b.id)));
 
-    // Membros: clicar torna comandante.
+    // Hospital automático em estado crítico.
+    const auto = cmdButton(
+      b.autoHospital ? 'Hospital: automático' : 'Hospital: desligado',
+      b.autoHospital ? 'recua em estado crítico' : 'luta até o fim',
+      '',
+      `Quando uma unidade marcada com ✚ ficar abaixo de ${Math.round(BALANCE.hospital.criticalHp * 100)}% de vida, o batalhão corre para um hospital com leitos para todos.`,
+      () => setAutoHospital(this.sim, b.id, !b.autoHospital),
+    );
+    if (b.autoHospital) auto.classList.add('active-mode');
+    this.commands.appendChild(auto);
+
+    // Membros: clicar no nome torna comandante; ✚ marca quem dispara o estado crítico.
     const list = el('div', 'bp-members wide');
-    list.appendChild(el('div', 'bp-sub', 'Membros (clique para tornar comandante):'));
+    list.appendChild(el('div', 'bp-sub', 'Membros — clique no nome para tornar comandante; ✚ = dispara o estado crítico:'));
     for (const u of battalionUnits(this.sim, b)) {
-      const row = document.createElement('button');
-      row.className = `bp-member ${u.id === b.commanderId ? 'commander' : ''}`;
-      row.textContent = `${u.id === b.commanderId ? '★ ' : ''}${u.name} — ${rankName(u.level)}`;
-      row.title = u.id === b.commanderId ? 'Comandante' : 'Clique para tornar comandante';
-      if (u.id !== b.commanderId) row.onclick = () => setCommander(this.sim, b.id, u.id);
+      const row = el('div', 'bp-member-row');
+      const crit = document.createElement('button');
+      crit.className = `bp-crit ${b.criticalIds.includes(u.id) ? 'on' : ''}`;
+      crit.textContent = '✚';
+      crit.title = b.criticalIds.includes(u.id) ? 'Esta unidade dispara o estado crítico (clique para desmarcar)' : 'Clique para esta unidade disparar o estado crítico';
+      crit.onclick = () => {
+        toggleCritical(this.sim, b.id, u.id);
+        crit.classList.toggle('on', b.criticalIds.includes(u.id));
+      };
+      const name = document.createElement('button');
+      name.className = `bp-member ${u.id === b.commanderId ? 'commander' : ''}`;
+      name.title = u.id === b.commanderId ? 'Comandante' : 'Clique para tornar comandante';
+      if (u.id !== b.commanderId) name.onclick = () => setCommander(this.sim, b.id, u.id);
+      const hpEl = el('span', 'bp-hp');
+      name.append(document.createTextNode(`${u.id === b.commanderId ? '★ ' : ''}${u.name} — ${rankName(u.level)} `), hpEl);
+      this.updaters.push(() => {
+        const frac = u.hp / unitMaxHp(this.sim.state, u);
+        hpEl.textContent = `${Math.round(frac * 100)}%`;
+        hpEl.classList.toggle('critical', frac < BALANCE.hospital.criticalHp);
+      });
+      row.append(crit, name);
       list.appendChild(row);
     }
+    this.commands.append(list);
+  }
+
+  private buildHospital(b: Building): void {
+    const H = BALANCE.hospital;
+    const beds = el('div', 'bp-line');
+    const docs = el('div', 'bp-line');
+    const upg = el('div', 'bp-line');
+    const bar = progressBar();
+    this.info.append(beds, docs, upg, bar.el);
+    this.updaters.push(() => {
+      beds.textContent = `Nível ${b.level} · Leitos: ${patients(this.sim, b).length}/${hospitalBeds(b)}`;
+      const d = doctors(this.sim, b).length;
+      docs.textContent = d ? `Médicos: ${d}/${H.maxDoctors} (cada um cura um soldado por vez)` : 'Sem médicos: mande aldeões para cá (botão direito).';
+      docs.classList.toggle('warn', d === 0);
+      if (b.upgradeProgress >= 0) {
+        upg.textContent = `Ampliando para o nível ${b.level + 1}...`;
+        bar.el.style.display = '';
+        bar.set(b.upgradeProgress / upgradeTime(b));
+      } else {
+        upg.textContent = '';
+        bar.el.style.display = 'none';
+      }
+    });
+    this.info.append(el('div', 'bp-hint', 'Mande soldados feridos com o botão direito. Curados saem sozinhos; batalhões saem juntos quando todos sararem.'));
+    if (b.level < H.maxLevel && b.upgradeProgress < 0) {
+      const cost = upgradeCost(b);
+      const up = cmdButton(`Ampliar (nível ${b.level + 1})`, formatCost(cost), '', `+${H.bedsPerLevel} leitos. Leva ${Math.round(upgradeTime(b))} s.`, () => {
+        const err = startHospitalUpgrade(this.sim, b.id);
+        if (err) this.toast(err);
+      });
+      this.commands.appendChild(up);
+      this.updaters.push(() => up.classList.toggle('disabled', !canAfford(this.sim, cost)));
+    }
+    if (b.doctorIds.length) this.commands.appendChild(dangerButton('Dispensar médicos', '', () => dismissDoctors(this.sim, b.id)));
+    // Pacientes com a vida de cada um.
+    const list = el('div', 'bp-members wide');
+    const ps = patients(this.sim, b);
+    if (ps.length) list.appendChild(el('div', 'bp-sub', 'Pacientes:'));
+    for (const p of ps.slice(0, 24)) {
+      const row = el('div', 'bp-member');
+      const hpEl = el('span', 'bp-hp');
+      row.append(document.createTextNode(`${p.name} — ${rankName(p.level)} `), hpEl);
+      this.updaters.push(() => (hpEl.textContent = `${Math.round((p.hp / unitMaxHp(this.sim.state, p)) * 100)}%`));
+      list.appendChild(row);
+    }
+    if (ps.length > 24) list.appendChild(el('div', 'bp-sub', `… e mais ${ps.length - 24}`));
     this.commands.append(list);
   }
 

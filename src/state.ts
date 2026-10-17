@@ -19,7 +19,7 @@ import type {
 import { BUILDING_DEFS, UNIT_DEFS } from './data/defs';
 import { randomName } from './entities/names';
 
-export const SAVE_VERSION = 6;
+export const SAVE_VERSION = 7;
 
 export interface LogEntry {
   tick: number;
@@ -132,6 +132,8 @@ export function newBuilding(id: number, kind: BuildingKind, tx: number, ty: numb
     research: null,
     trainerId: 0,
     guardId: 0,
+    doctorIds: [],
+    upgradeProgress: -1,
   };
 }
 

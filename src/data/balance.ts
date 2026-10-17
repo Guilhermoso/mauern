@@ -37,6 +37,16 @@ export const BALANCE = {
     maxBatch: 3, // unidades militares treinadas juntas num lote (aldeões: sempre 1)
     batchExtraTime: 0.8, // cada unidade extra do lote soma 80% do tempo de uma unidade
   },
+  hospital: {
+    bedsPerLevel: 20, // leitos por nível (nível máximo 5 = 100 leitos)
+    maxLevel: 5,
+    maxDoctors: 3,
+    healPerSecond: 1.5, // vida curada por segundo, por médico
+    upgradeCost: { wood: 100, stone: 60, gold: 20 }, // multiplicado pelo nível de destino
+    upgradeSeconds: 60, // multiplicado pelo nível de destino
+    criticalHp: 0.3, // abaixo de 30% de vida a unidade está em estado crítico
+    groupRadius: 5, // tiles: o batalhão espera os membros chegarem perto antes de entrar junto
+  },
   refuge: {
     fleeRadius: 7, // tiles: aldeões fogem quando um titã chega a essa distância
     terrorSeconds: 60, // duração do terror (segundos de jogo na velocidade 1x)

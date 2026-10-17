@@ -22,6 +22,7 @@ export interface BuildingDef {
   wall?: boolean; // segmento de muralha: construído arrastando uma linha
   gate?: boolean; // portão: passagem para os humanos, barreira para os titãs
   garrison: number; // quantas unidades podem se abrigar dentro
+  hospital?: boolean; // recebe soldados feridos (leitos pelo nível) e médicos
   attack?: BuildingAttack; // edifícios que atiram flechas nos titãs
 }
 
@@ -106,6 +107,13 @@ export const BUILDING_DEFS: Record<BuildingKind, BuildingDef> = {
     size: 1, maxHp: 250, housing: 0, cost: { wood: 30, stone: 20 }, buildTime: 15,
     dropsite: [], walkable: false, trains: [], hotkey: 'KeyV', garrison: 0,
   },
+  hospital: {
+    name: 'Hospital de Milícia',
+    feminine: false,
+    description: 'Soldados feridos ficam aqui até serem curados por completo. Designe até 3 aldeões como médicos.',
+    size: 3, maxHp: 900, housing: 0, cost: { wood: 150, stone: 50 }, buildTime: 40,
+    dropsite: [], walkable: false, trains: [], hotkey: 'KeyI', garrison: 0, hospital: true,
+  },
   refuge: {
     name: 'Campo de Refúgio',
     feminine: false,
@@ -130,7 +138,7 @@ export const BUILDING_DEFS: Record<BuildingKind, BuildingDef> = {
 };
 
 // Ordem dos botões no menu de construção do aldeão.
-export const VILLAGER_BUILDS: BuildingKind[] = ['house', 'well', 'bonfire', 'lumberCamp', 'miningCamp', 'mill', 'farm', 'palisade', 'gate', 'watchTower', 'trainingGround', 'refuge'];
+export const VILLAGER_BUILDS: BuildingKind[] = ['house', 'well', 'bonfire', 'lumberCamp', 'miningCamp', 'mill', 'farm', 'palisade', 'gate', 'watchTower', 'trainingGround', 'refuge', 'hospital'];
 
 export interface UnitDef {
   name: string;

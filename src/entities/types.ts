@@ -28,7 +28,8 @@ export type BuildingKind =
   | 'well'
   | 'bonfire'
   | 'trainingGround'
-  | 'refuge';
+  | 'refuge'
+  | 'hospital';
 
 export interface TrainItem {
   kind: UnitKind;
@@ -60,6 +61,8 @@ export interface Building {
   research: { tech: string; progress: number } | null;
   trainerId: number; // campo de treinamento: soldado que comanda o treino (0 = nenhum)
   guardId: number; // campo de refúgio: soldado no posto (0 = nenhum)
+  doctorIds: number[]; // hospital: aldeões designados como médicos
+  upgradeProgress: number; // segundos de ampliação já feitos (-1 = não está ampliando)
 }
 
 export type UnitKind = 'villager' | 'scout' | 'militia';
@@ -112,7 +115,11 @@ export interface Unit {
 
 export type BattalionMode = 'manual' | 'defend' | 'hunt';
 
-export type BattalionOrder = { type: 'idle' } | { type: 'move'; tx: number; ty: number } | { type: 'attack'; titanId: number };
+export type BattalionOrder =
+  | { type: 'idle' }
+  | { type: 'move'; tx: number; ty: number }
+  | { type: 'attack'; titanId: number }
+  | { type: 'hospital'; buildingId: number }; // marchando para o hospital, para entrar todos juntos
 
 export interface Battalion {
   id: number;
@@ -123,6 +130,9 @@ export interface Battalion {
   order: BattalionOrder;
   guard: { tx: number; ty: number } | null; // modo defender: ponto a proteger
   patrol: { tx: number; ty: number } | null; // modo caçar: destino da busca
+  criticalIds: number[]; // unidades que, em estado crítico, mandam o batalhão ao hospital
+  autoHospital: boolean; // corre sozinho para o hospital em estado crítico
+  inHospital: number; // hospital onde o batalhão está internado (0 = nenhum)
 }
 
 export type TitanKind = 'common';

@@ -7,6 +7,9 @@ import { clearPath, moveTo, stepToward } from './movement';
 import { titanAt } from './commands';
 import { isSoldier } from './soldiers';
 import { nearestTitan } from './combat';
+import { freeBeds, nearestHospitalWithBeds } from './hospital';
+import { unitMaxHp } from './modifiers';
+import { BUILDING_DEFS } from '../data/defs';
 
 const S = BALANCE.soldiers;
 
@@ -52,6 +55,9 @@ export function formBattalion(sim: Sim, ids: readonly number[]): { battalion?: B
     order: { type: 'idle' },
     guard: null,
     patrol: null,
+    criticalIds: [commander.id],
+    autoHospital: true,
+    inHospital: 0,
   };
   s.battalions.push(b);
   for (const u of [commander, ...members]) {
@@ -77,6 +83,7 @@ export function setCommander(sim: Sim, id: number, unitId: number): void {
   if (!b || !b.memberIds.includes(unitId)) return;
   b.memberIds = [b.commanderId, ...b.memberIds.filter((m) => m !== unitId)];
   b.commanderId = unitId;
+  if (!b.criticalIds.includes(unitId)) b.criticalIds.push(unitId);
   enforceCapacity(sim, b);
   const c = sim.unit(unitId);
   if (c) {
@@ -119,10 +126,36 @@ export function battalionCommand(sim: Sim, id: number, wx: number, wy: number): 
   if (!b) return;
   b.mode = 'manual';
   b.patrol = null;
+  if (b.inHospital) return;
   const titanId = titanAt(sim, wx, wy);
+  const target = sim.buildingAt(Math.floor(wx / sim.tileSize), Math.floor(wy / sim.tileSize));
   if (titanId !== null) b.order = { type: 'attack', titanId };
+  else if (target && target.built && BUILDING_DEFS[target.kind].hospital) b.order = { type: 'hospital', buildingId: target.id };
   else b.order = { type: 'move', tx: Math.floor(wx / sim.tileSize), ty: Math.floor(wy / sim.tileSize) };
 }
+
+// Escolhe quais unidades do batalhão disparam o estado crítico (por padrão, só o comandante).
+export function toggleCritical(sim: Sim, id: number, unitId: number): void {
+  const b = battalionOf(sim, id);
+  if (!b) return;
+  b.criticalIds = b.criticalIds.includes(unitId) ? b.criticalIds.filter((x) => x !== unitId) : [...b.criticalIds, unitId];
+}
+
+export function setAutoHospital(sim: Sim, id: number, on: boolean): void {
+  const b = battalionOf(sim, id);
+  if (b) b.autoHospital = on;
+}
+
+// Estado crítico: alguma unidade marcada abaixo de 30% de vida.
+export function isCritical(sim: Sim, b: Battalion): boolean {
+  return b.criticalIds.some((id) => {
+    const u = sim.unit(id);
+    return !!u && u.battalion === b.id && u.hp < unitMaxHp(sim.state, u) * BALANCE.hospital.criticalHp;
+  });
+}
+
+// Aviso de "sem leitos" no máximo a cada 30 s por batalhão.
+const noBedsWarned = new Map<number, number>();
 
 // Posição de cada membro na formação: fileiras atrás do comandante, viradas para onde ele olha.
 export function formationSlot(_sim: Sim, b: Battalion, commander: Unit, index: number): { x: number; y: number } {
@@ -195,13 +228,36 @@ export function updateBattalions(sim: Sim): void {
       }
       b.commanderId = next.id;
       b.memberIds = b.memberIds.filter((id) => id !== next.id);
+      if (!b.criticalIds.includes(next.id)) b.criticalIds.push(next.id);
       enforceCapacity(sim, b);
       addLog(s, `${next.name} assumiu o comando do ${b.name}.`);
       c = next;
       c.order = { type: 'idle' };
       clearPath(c);
     }
+    b.criticalIds = b.criticalIds.filter((id) => id === b.commanderId || b.memberIds.includes(id));
+    // Internado: nada a fazer até receber alta.
+    if (b.inHospital) {
+      if (!sim.building(b.inHospital)) b.inHospital = 0;
+      else continue;
+    }
     const units = battalionUnits(sim, b);
+    // Estado crítico: corre para um hospital com leitos para todos.
+    if (b.autoHospital && b.order.type !== 'hospital' && isCritical(sim, b)) {
+      const h = nearestHospitalWithBeds(sim, c.x, c.y, units.length, b.id);
+      if (h) {
+        b.order = { type: 'hospital', buildingId: h.id };
+        addLog(s, `${b.name} em estado crítico: recuando para o hospital.`);
+      } else if ((noBedsWarned.get(b.id) ?? -Infinity) + 30 * BALANCE.time.ticksPerSecond < s.tick) {
+        noBedsWarned.set(b.id, s.tick);
+        const text = `${b.name} em estado crítico, mas não há hospital com ${units.length} leitos livres!`;
+        sim.alerts.push({ kind: 'underAttack', text, x: c.x, y: c.y });
+      }
+    }
+    if (b.order.type === 'hospital') {
+      updateHospitalMarch(sim, b, c, units);
+      continue;
+    }
     // O comandante anda no passo do mais lento, para o batalhão não se separar.
     const slowest = Math.min(...units.map((u) => UNIT_DEFS[u.kind].speed));
     for (const u of units) u.speedCap = u === c ? slowest : 0;
@@ -242,6 +298,69 @@ export function updateBattalions(sim: Sim): void {
 
     applyOrder(sim, b, c, units);
   }
+}
+
+// Marcha até o hospital; quando todos estão perto e há leitos para todos, entram juntos.
+function updateHospitalMarch(sim: Sim, b: Battalion, c: Unit, units: Unit[]): void {
+  const o = b.order as Extract<Battalion['order'], { type: 'hospital' }>;
+  const h = sim.building(o.buildingId);
+  if (!h || !h.built) {
+    b.order = { type: 'idle' };
+    return;
+  }
+  const ts = sim.tileSize;
+  const slowest = Math.min(...units.map((u) => UNIT_DEFS[u.kind].speed));
+  for (const u of units) u.speedCap = u === c ? slowest : 0;
+  const size = BUILDING_DEFS[h.kind].size;
+  const hx = (h.tx + size / 2) * ts;
+  const hy = (h.ty + size / 2) * ts;
+  for (const m of units) {
+    if (m !== c && m.order.type !== 'follow') {
+      m.order = { type: 'follow' };
+      clearPath(m);
+    }
+  }
+  const nearDoor = Math.hypot(c.x - hx, c.y - hy) <= (size / 2 + 1.6) * ts;
+  if (!nearDoor) {
+    // O comandante só se aproxima (até o tile livre mais próximo em volta do hospital):
+    // quem decide a entrada é o batalhão inteiro, abaixo.
+    let best: { tx: number; ty: number } | null = null;
+    let bestD = Infinity;
+    for (let y = h.ty - 1; y <= h.ty + size; y++) {
+      for (let x = h.tx - 1; x <= h.tx + size; x++) {
+        if (!sim.nav.isFree(x, y)) continue;
+        const d = Math.hypot((x + 0.5) * ts - c.x, (y + 0.5) * ts - c.y);
+        if (d < bestD) {
+          bestD = d;
+          best = { tx: x, ty: y };
+        }
+      }
+    }
+    if (best && (c.order.type !== 'move' || c.order.tx !== best.tx || c.order.ty !== best.ty)) {
+      if (c.order.type !== 'move' || c.path.length === 0) {
+        c.order = { type: 'move', tx: best.tx, ty: best.ty };
+        clearPath(c);
+      }
+    }
+    return;
+  }
+  if (c.order.type !== 'idle') {
+    c.order = { type: 'idle' };
+    clearPath(c);
+  }
+  const together = units.every((u) => Math.hypot(u.x - c.x, u.y - c.y) <= BALANCE.hospital.groupRadius * ts);
+  if (!together || freeBeds(sim, h, b.id) < units.length) return;
+  for (const u of units) {
+    u.garrison = h.id;
+    u.x = hx;
+    u.y = hy;
+    u.order = { type: 'idle' };
+    u.speedCap = 0;
+    clearPath(u);
+  }
+  b.inHospital = h.id;
+  b.order = { type: 'idle' };
+  addLog(sim.state, `${b.name} foi internado no hospital.`);
 }
 
 function applyOrder(sim: Sim, b: Battalion, c: Unit, units: Unit[]): void {

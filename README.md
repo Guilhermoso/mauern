@@ -34,6 +34,12 @@ uma posição ou caçar titãs pelo mapa.
 uma unidade ao lote, Shift+clique enfileira um lote cheio, e o lote sai junto (mais rápido do que um por um).
 O progresso aparece como uma pizza girando no sentido horário sobre o ícone.
 
+**Hospital de Milícia:** soldados feridos (clique direito no hospital) ficam internados e protegidos; até 3
+aldeões designados como médicos curam um soldado cada por vez, e quem chega a 100% sai sozinho. O hospital tem
+20 leitos e pode ser ampliado até o nível 5 (100 leitos). Batalhões em **estado crítico** (uma unidade marcada
+com ✚ abaixo de 30% de vida — por padrão só o comandante) correm sozinhos para um hospital com leitos para
+todos, entram juntos e saem juntos quando todos sararem.
+
 **Aldeões espertos:** quando um titã chega perto, os aldeões largam o que estão fazendo e correm para um abrigo
 — de preferência o **Campo de Refúgio**. Eles ficam aterrorizados por um tempo e não saem até o terror passar;
 um soldado no posto do refúgio acalma o terror mais rápido (quanto maior o nível, mais rápido). Depois, você
@@ -52,6 +58,8 @@ escolhe: **Sair** (ficam ociosos) ou **Voltar ao trabalho** (retomam o que fazia
 | Formar batalhão | B com soldados selecionados · modos e "Desfazer" no painel do batalhão |
 | Campo de Refúgio (com aldeão selecionado) | U. Para pôr um guarda: clique direito no refúgio com um soldado |
 | Liberar abrigados (edifício selecionado) | U ou botões "Sair" / "Voltar ao trabalho" |
+| Hospital (com aldeão selecionado) | I. Clique direito nele com aldeões (médicos) ou soldados feridos; batalhões também |
+| Seleção | Duplo clique ignora unidades dentro de edifícios; a caixa pega só militares se houver algum nela |
 | Atacar um titã | Selecione unidades e clique direito no titã |
 | Abrigar unidades | Clique direito no Centro da Vila ou numa torre · U libera os abrigados |
 | Sino de alarme (Centro da Vila selecionado) | B toca / desliga: aldeões se abrigam e depois voltam ao trabalho |

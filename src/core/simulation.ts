@@ -10,6 +10,7 @@ import { updateResearch } from '../systems/research';
 import { updateEvents } from '../systems/events';
 import { updateBattalions } from '../systems/battalions';
 import { updateFear, updateTerror } from '../systems/refuge';
+import { updateHospitals } from '../systems/hospital';
 
 // Um passo fixo da simulação. Não depende da renderização.
 export function step(sim: Sim): void {
@@ -24,6 +25,7 @@ export function step(sim: Sim): void {
   updateFear(sim);
   updateUnits(sim);
   updateTerror(sim);
+  updateHospitals(sim);
   updateTitans(sim);
   updateBuildingAttacks(sim);
   updateResearch(sim);

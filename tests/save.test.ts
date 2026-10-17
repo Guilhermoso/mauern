@@ -68,6 +68,8 @@ describe('migrações', () => {
     expect(migrated.morale).toBe(60);
     expect(migrated.battalions).toEqual([]);
     expect(migrated.units[0].level).toBe(1);
+    expect(migrated.buildings[0].doctorIds).toEqual([]);
+    expect(migrated.buildings[0].upgradeProgress).toBe(-1);
     expect(migrated.buildings[0].built).toBe(true);
     expect(migrated.units[0].order).toEqual({ type: 'idle' });
     // O jogo migrado roda normalmente.

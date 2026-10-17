@@ -8,6 +8,7 @@ import { ejectGarrison, garrisonCount, killTitan, titanRadius } from './damage';
 import { buildingCenter } from './queries';
 import { flat, unitAttack } from './modifiers';
 import { gainXp } from './soldiers';
+import { canEnterHospital } from './hospital';
 
 const TPS = BALANCE.time.ticksPerSecond;
 const DT = 1 / TPS;
@@ -98,7 +99,7 @@ export function updateGarrisonOrder(sim: Sim, u: Unit, o: GarrisonOrder): boolea
   const r = moveTo(sim, u, { x0: b.tx, y0: b.ty, x1: b.tx + def.size - 1, y1: b.ty + def.size - 1, adjacent: true });
   if (r === 'unreachable') return false;
   if (r === 'moving') return true;
-  if (garrisonCount(sim, b) >= def.garrison) return false;
+  if (def.hospital ? !canEnterHospital(sim, b, u) : garrisonCount(sim, b) >= def.garrison) return false;
   const c = buildingCenter(sim, b);
   u.garrison = b.id;
   u.x = c.x;
