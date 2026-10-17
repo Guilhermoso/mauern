@@ -139,6 +139,13 @@ function battalionOfUnit(sim: Sim, u: Unit): Battalion | undefined {
   return u.battalion ? sim.state.battalions.find((b) => b.id === u.battalion) : undefined;
 }
 
+// Nobres e os soldados do batalhão de um nobre são curados primeiro.
+export function hasNoblePriority(sim: Sim, u: Unit): boolean {
+  if (u.noble) return true;
+  const b = battalionOfUnit(sim, u);
+  return !!b && [b.commanderId, ...b.memberIds].some((id) => sim.unit(id)?.noble);
+}
+
 export function updateHospitals(sim: Sim): void {
   const s = sim.state;
   for (const h of s.buildings) {
@@ -154,10 +161,12 @@ export function updateHospitals(sim: Sim): void {
       }
     }
 
-    // Cada médico cuida de um paciente por vez, na ordem de chegada.
+    // Cada médico cuida de um paciente por vez, na ordem de chegada — mas nobres e o batalhão
+    // de um nobre têm prioridade.
     const docs = doctors(sim, h);
     const list = patients(sim, h);
     const needing = list.filter((u) => u.hp < unitMaxHp(s, u));
+    needing.sort((a, b) => (hasNoblePriority(sim, a) ? 0 : 1) - (hasNoblePriority(sim, b) ? 0 : 1));
     for (let i = 0; i < Math.min(docs.length, needing.length); i++) {
       const p = needing[i];
       p.hp = Math.min(unitMaxHp(s, p), p.hp + H.healPerSecond * DT);

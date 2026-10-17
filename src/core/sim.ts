@@ -35,6 +35,8 @@ export class Sim {
   alerts: Alert[] = [];
   // Último tick em que cada unidade recalculou o caminho (para limitar recálculos caros; não é salvo).
   lastRepath = new Map<number, number>();
+  // Titãs intimidados por uma lenda neste passo (derivado; não é salvo).
+  intimidated = new Set<number>();
 
   constructor(readonly state: GameState) {
     this.nav = new NavGrid(state.world);

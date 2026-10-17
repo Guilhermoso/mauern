@@ -111,9 +111,17 @@ export interface Unit {
   battalion: number; // batalhão ao qual pertence (0 = avulso)
   speedCap: number; // velocidade máxima imposta pelo batalhão (0 = sem limite)
   terror: number; // segundos de terror restantes (aldeões que fugiram de um titã)
+  noble: boolean; // soldados: recebeu título de nobreza
+  kills: number; // soldados: titãs abatidos (a cada 10, uma honra)
+  shield: number; // escudo atual (lendas e o batalhão de uma lenda)
+  lastCombatTick: number; // último tick em que atacou ou foi atingido
+  speedBonus: number; // bônus de velocidade dado pelo batalhão (0,05 = +5%)
 }
 
 export type BattalionMode = 'manual' | 'defend' | 'hunt';
+
+// Formações (escolhíveis com comandante a partir do nível 40).
+export type Formation = 'block' | 'line' | 'column' | 'wedge' | 'circle';
 
 export type BattalionOrder =
   | { type: 'idle' }
@@ -133,6 +141,7 @@ export interface Battalion {
   criticalIds: number[]; // unidades que, em estado crítico, mandam o batalhão ao hospital
   autoHospital: boolean; // corre sozinho para o hospital em estado crítico
   inHospital: number; // hospital onde o batalhão está internado (0 = nenhum)
+  formation: Formation;
 }
 
 export type TitanKind = 'common';

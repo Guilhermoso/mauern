@@ -7,6 +7,7 @@ import type { Building, Titan } from '../entities/types';
 import { findPath, goalKey, type CostFn, type Goal } from '../world/pathfinding';
 import { stepToward } from './movement';
 import { damageBuilding, damageUnit, titanRadius } from './damage';
+import { titanDamageFactor } from './nobility';
 
 const T = BALANCE.titans;
 const TPS = BALANCE.time.ticksPerSecond;
@@ -230,6 +231,8 @@ export function updateTitans(sim: Sim): void {
 
   for (const t of [...sim.state.titans]) {
     const st = titanStats(t.height);
+    // Intimidado por uma lenda: golpeia com menos força.
+    const dmg = st.damage * titanDamageFactor(sim, t.id);
     t.hp = Math.min(t.maxHp, t.hp + T.regenPerSecond * DT);
     if (t.attackCooldown > 0) t.attackCooldown -= DT;
     const speed = st.speed * (day ? 1 : T.nightSpeedFactor);
@@ -253,7 +256,7 @@ export function updateTitans(sim: Sim): void {
       if (d <= reach) {
         if (t.attackCooldown <= 0) {
           t.attackCooldown = T.attackCooldown;
-          damageUnit(sim, u, st.damage, true);
+          damageUnit(sim, u, dmg, true);
         }
         continue;
       }
@@ -265,7 +268,7 @@ export function updateTitans(sim: Sim): void {
     } else if (t.targetKind === 'building' || t.targetKind === 'march') {
       const b = sim.building(t.targetId)!;
       if (distToBuilding(sim, t.x, t.y, b) <= st.radius * 0.5 + 14) {
-        attackBuilding(sim, t, b, st.damage * T.buildingDamageFactor);
+        attackBuilding(sim, t, b, dmg * T.buildingDamageFactor);
         continue;
       }
       const s = BUILDING_DEFS[b.kind].size;
@@ -283,7 +286,7 @@ export function updateTitans(sim: Sim): void {
       const nty = Math.floor(ny / ts);
       if (sim.nav.isTerrainWalkable(ntx, nty)) {
         const blocker = structureAt(sim, ntx, nty);
-        if (blocker) attackOrApproach(sim, t, blocker, st.damage * T.buildingDamageFactor, speed);
+        if (blocker) attackOrApproach(sim, t, blocker, dmg * T.buildingDamageFactor, speed);
         else stepToward(t, targetX, targetY, speed);
         continue;
       }
@@ -307,7 +310,7 @@ export function updateTitans(sim: Sim): void {
     const ny = (next - nx) / w;
     const blocker = structureAt(sim, nx, ny);
     if (blocker) {
-      attackOrApproach(sim, t, blocker, st.damage * T.buildingDamageFactor, speed);
+      attackOrApproach(sim, t, blocker, dmg * T.buildingDamageFactor, speed);
       continue;
     }
     t.facing = Math.atan2((ny + 0.5) * ts - t.y, (nx + 0.5) * ts - t.x);

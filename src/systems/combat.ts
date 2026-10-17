@@ -8,6 +8,8 @@ import { ejectGarrison, garrisonCount, killTitan, titanRadius } from './damage';
 import { buildingCenter } from './queries';
 import { flat, unitAttack } from './modifiers';
 import { gainXp } from './soldiers';
+import { damageToTitanFactor } from './nobility';
+import { honors } from './modifiers';
 import { canEnterHospital } from './hospital';
 
 const TPS = BALANCE.time.ticksPerSecond;
@@ -18,13 +20,22 @@ type GarrisonOrder = Extract<UnitOrder, { type: 'garrison' }>;
 
 // Dano em titã. Se veio de um soldado, ele ganha experiência (e, no abate, o batalhão também).
 export function hitTitan(sim: Sim, t: Titan, damage: number, attacker?: Unit): void {
-  t.hp -= damage;
+  // Titã intimidado por uma lenda: vida base 5% menor (cada golpe conta mais).
+  t.hp -= damage * damageToTitanFactor(sim, t.id);
   t.lastHitTick = sim.state.tick;
   const S = BALANCE.soldiers;
   if (attacker) gainXp(sim, attacker, damage * S.xpPerDamage);
   if (t.hp <= 0) {
     killTitan(sim, t);
     if (attacker) {
+      const before = honors(attacker);
+      attacker.kills++;
+      const now = honors(attacker);
+      if (now > before) {
+        const text = `${attacker.name} recebeu a ${now}ª honra (${attacker.kills} titãs abatidos).`;
+        addLog(sim.state, text);
+        sim.alerts.push({ kind: 'promotion', text, x: attacker.x, y: attacker.y });
+      }
       const bonus = S.xpPerKillPerMeter * t.height;
       gainXp(sim, attacker, bonus);
       if (attacker.battalion) {
@@ -61,6 +72,7 @@ export function updateAttack(sim: Sim, u: Unit, o: AttackOrder): boolean {
     u.facing = Math.atan2(t.y - u.y, t.x - u.x);
     if (u.attackCooldown <= 0) {
       u.attackCooldown = def.attackCooldown;
+      u.lastCombatTick = sim.state.tick;
       sim.fx.push({ type: 'hit', x: t.x, y: t.y });
       hitTitan(sim, t, unitAttack(sim.state, u), u);
     }

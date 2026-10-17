@@ -2,13 +2,13 @@ import { BALANCE } from '../data/balance';
 import { UNIT_DEFS } from '../data/defs';
 import type { Sim } from '../core/sim';
 import { addLog } from '../state';
-import type { Battalion, BattalionMode, Unit } from '../entities/types';
+import type { Battalion, BattalionMode, Formation, Unit } from '../entities/types';
 import { clearPath, moveTo, stepToward } from './movement';
 import { titanAt } from './commands';
-import { isSoldier } from './soldiers';
+import { gainXp, isSoldier } from './soldiers';
 import { nearestTitan } from './combat';
 import { freeBeds, nearestHospitalWithBeds } from './hospital';
-import { leadershipBonus, unitMaxHp } from './modifiers';
+import { buffFraction, unitMaxHp } from './modifiers';
 import { BUILDING_DEFS } from '../data/defs';
 
 const S = BALANCE.soldiers;
@@ -31,6 +31,7 @@ export function battalionUnits(sim: Sim, b: Battalion): Unit[] {
 function release(u: Unit): void {
   u.battalion = 0;
   u.speedCap = 0;
+  u.speedBonus = 0;
   u.order = { type: 'idle' };
   clearPath(u);
 }
@@ -58,6 +59,7 @@ export function formBattalion(sim: Sim, ids: readonly number[]): { battalion?: B
     criticalIds: [commander.id],
     autoHospital: true,
     inHospital: 0,
+    formation: 'block',
   };
   s.battalions.push(b);
   for (const u of [commander, ...members]) {
@@ -141,6 +143,24 @@ export function toggleCritical(sim: Sim, id: number, unitId: number): void {
   b.criticalIds = b.criticalIds.includes(unitId) ? b.criticalIds.filter((x) => x !== unitId) : [...b.criticalIds, unitId];
 }
 
+// Formação: só comandantes a partir do nível 40 escolhem; abaixo disso, o bloco padrão.
+export function canChooseFormation(sim: Sim, b: Battalion): boolean {
+  const c = sim.unit(b.commanderId);
+  return !!c && c.level >= S.formationUnlockLevel;
+}
+
+export function setFormation(sim: Sim, id: number, formation: Formation): string | null {
+  const b = battalionOf(sim, id);
+  if (!b) return 'Batalhão indisponível.';
+  if (!canChooseFormation(sim, b)) return `O comandante precisa de nível ${S.formationUnlockLevel} para escolher a formação.`;
+  b.formation = formation;
+  return null;
+}
+
+export function effectiveFormation(sim: Sim, b: Battalion): Formation {
+  return canChooseFormation(sim, b) ? b.formation : 'block';
+}
+
 export function setAutoHospital(sim: Sim, id: number, on: boolean): void {
   const b = battalionOf(sim, id);
   if (b) b.autoHospital = on;
@@ -157,14 +177,42 @@ export function isCritical(sim: Sim, b: Battalion): boolean {
 // Aviso de "sem leitos" no máximo a cada 30 s por batalhão.
 const noBedsWarned = new Map<number, number>();
 
-// Posição de cada membro na formação: fileiras atrás do comandante, viradas para onde ele olha.
-export function formationSlot(_sim: Sim, b: Battalion, commander: Unit, index: number): { x: number; y: number } {
+// Posição de cada membro na formação, relativa ao comandante e virada para onde ele olha.
+// row = fileiras para trás; col = deslocamento lateral.
+export function formationSlot(sim: Sim, b: Battalion, commander: Unit, index: number): { x: number; y: number } {
   const n = b.memberIds.length;
-  const width = Math.max(2, Math.ceil(Math.sqrt(n + 1)));
-  const row = Math.floor(index / width) + 1;
-  const col = (index % width) - (Math.min(width, n - (row - 1) * width) - 1) / 2;
   const f = commander.facing;
   const sp = S.formationSpacing;
+  let row: number;
+  let col: number;
+  switch (effectiveFormation(sim, b)) {
+    case 'line': // uma fileira só, lado a lado, logo atrás do comandante
+      row = 1;
+      col = index - (n - 1) / 2;
+      break;
+    case 'column': // em fila indiana
+      row = index + 1;
+      col = 0;
+      break;
+    case 'wedge': { // cunha: um "V" aberto para trás, com o comandante na ponta
+      const k = Math.floor(index / 2) + 1;
+      row = k;
+      col = index % 2 ? k : -k;
+      break;
+    }
+    case 'circle': { // anel em volta do comandante
+      const r = Math.max(1.5, (n * 1.1) / (2 * Math.PI));
+      const a = (index / Math.max(1, n)) * Math.PI * 2;
+      row = -Math.cos(a) * r;
+      col = Math.sin(a) * r;
+      break;
+    }
+    default: { // bloco: fileiras atrás do comandante
+      const width = Math.max(2, Math.ceil(Math.sqrt(n + 1)));
+      row = Math.floor(index / width) + 1;
+      col = (index % width) - (Math.min(width, n - (row - 1) * width) - 1) / 2;
+    }
+  }
   return {
     x: commander.x - Math.cos(f) * row * sp - Math.sin(f) * col * sp,
     y: commander.y - Math.sin(f) * row * sp + Math.cos(f) * col * sp,
@@ -212,9 +260,9 @@ function pickPatrolPoint(sim: Sim): { tx: number; ty: number } | null {
   return null;
 }
 
-// Bônus de comando de cada soldado no último passo: quando ele muda (entrou ou saiu do alcance
-// do comandante, ou o comandante subiu de nível), a vida atual é ajustada na mesma proporção.
-// Só o bônus de comando entra aqui — subir de nível e pesquisas já ajustam a vida por conta própria.
+// Soma dos bônus percentuais de cada soldado no último passo (comando, auras, honras): quando ela
+// muda, a vida atual é ajustada na mesma proporção. Só os bônus percentuais entram aqui — subir de
+// nível, pesquisas e o título de nobreza já ajustam a vida por conta própria.
 const lastLeadership = new WeakMap<Sim, Map<number, number>>();
 
 function syncLeadershipHp(sim: Sim): void {
@@ -224,7 +272,7 @@ function syncLeadershipHp(sim: Sim): void {
   for (const u of sim.state.units) {
     if (!UNIT_DEFS[u.kind].military) continue;
     seen.add(u.id);
-    const bonus = leadershipBonus(sim.state, u);
+    const bonus = buffFraction(sim.state, u);
     const prev = map.get(u.id);
     if (prev !== undefined && prev !== bonus) u.hp = Math.min(unitMaxHp(sim.state, u), u.hp * ((1 + bonus) / (1 + prev)));
     map.set(u.id, bonus);
@@ -263,6 +311,14 @@ export function updateBattalions(sim: Sim): void {
       else continue;
     }
     const units = battalionUnits(sim, b);
+    // Nobre no batalhão: todos andam 5% mais rápido.
+    const speedBonus = units.some((u) => u.noble) ? BALANCE.nobility.battalionSpeed : 0;
+    for (const u of units) u.speedBonus = speedBonus;
+    // Caçando titãs: todos ganham experiência conforme o nível do comandante.
+    if (b.mode === 'hunt') {
+      const xp = Math.floor(c.level / S.huntXpPerLevels) / BALANCE.time.ticksPerSecond;
+      if (xp > 0) for (const u of units) gainXp(sim, u, xp);
+    }
     // Estado crítico: corre para um hospital com leitos para todos.
     if (b.autoHospital && b.order.type !== 'hospital' && isCritical(sim, b)) {
       const h = nearestHospitalWithBeds(sim, c.x, c.y, units.length, b.id);
@@ -281,7 +337,7 @@ export function updateBattalions(sim: Sim): void {
     }
     // O comandante anda no passo do mais lento, para o batalhão não se separar.
     const slowest = Math.min(...units.map((u) => UNIT_DEFS[u.kind].speed));
-    for (const u of units) u.speedCap = u === c ? slowest : 0;
+    for (const u of units) u.speedCap = u === c ? slowest * (1 + u.speedBonus) : 0;
 
     // Decide a ordem do batalhão conforme o modo.
     if (b.order.type === 'attack' && !sim.titan(b.order.titanId)) b.order = { type: 'idle' };
@@ -331,7 +387,7 @@ function updateHospitalMarch(sim: Sim, b: Battalion, c: Unit, units: Unit[]): vo
   }
   const ts = sim.tileSize;
   const slowest = Math.min(...units.map((u) => UNIT_DEFS[u.kind].speed));
-  for (const u of units) u.speedCap = u === c ? slowest : 0;
+  for (const u of units) u.speedCap = u === c ? slowest * (1 + u.speedBonus) : 0;
   const size = BUILDING_DEFS[h.kind].size;
   const hx = (h.tx + size / 2) * ts;
   const hy = (h.ty + size / 2) * ts;

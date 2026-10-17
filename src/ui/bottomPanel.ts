@@ -18,10 +18,11 @@ import { buildingMaxHp, unitMaxHp } from '../systems/modifiers';
 import { housingOf } from '../state';
 import { rankName, xpToNext, MAX_LEVEL } from '../data/ranks';
 import { isSoldier, setTrainer, trainees, trainer, trainingRate, dismissTraining } from '../systems/soldiers';
-import { battalionCapacity, battalionOf, battalionUnits, disbandBattalion, setAutoHospital, setCommander, setMode, toggleCritical } from '../systems/battalions';
+import { battalionCapacity, battalionOf, battalionUnits, canChooseFormation, disbandBattalion, setAutoHospital, setCommander, setFormation, setMode, toggleCritical } from '../systems/battalions';
+import { canEnnoble, ennoble } from '../systems/nobility';
 import { dismissDoctors, doctors, hospitalBeds, patients, startHospitalUpgrade, upgradeCost, upgradeTime } from '../systems/hospital';
-import { leadershipBonus, unitAttack } from '../systems/modifiers';
-import type { Building, Unit, UnitKind } from '../entities/types';
+import { auraBonus, buffFraction, honorBonus, honors, isLegend, leadershipBonus, shieldInfo, unitAttack } from '../systems/modifiers';
+import type { Building, Formation, Unit, UnitKind } from '../entities/types';
 
 // Painel inferior: informações do que está selecionado e botões de comando.
 // O conteúdo só é reconstruído quando a "estrutura" muda (outra seleção, fila diferente etc.);
@@ -54,11 +55,14 @@ export class BottomPanel {
     const s = this.sel.selection;
     if (s.battalions.length === 1 && !s.units.length) {
       const b = battalionOf(this.sim, s.battalions[0]);
-      return b ? `bat:${b.id}:${b.commanderId}:${b.memberIds.join(',')}:${b.mode}:${b.autoHospital}` : '';
+      if (!b) return '';
+      const titles = battalionUnits(this.sim, b).map((u) => `${u.noble ? 'n' : ''}${canEnnoble(u) ? 'e' : ''}`).join('');
+      return `bat:${b.id}:${b.commanderId}:${b.memberIds.join(',')}:${b.mode}:${b.autoHospital}:${b.formation}:${canChooseFormation(this.sim, b)}:${titles}`;
     }
     if (s.battalions.length) return `bats:${s.battalions.join(',')}:${s.units.join(',')}`;
     if (s.units.length) {
-      const one = s.units.length === 1 ? this.sim.unit(s.units[0])?.kind : '';
+      const u1 = s.units.length === 1 ? this.sim.unit(s.units[0]) : undefined;
+      const one = u1 ? `${u1.kind}:${u1.noble}:${canEnnoble(u1)}` : '';
       return `u:${s.units.join(',')}:${one}`;
     }
     if (s.building !== null) {
@@ -98,6 +102,7 @@ export class BottomPanel {
       hp.textContent = `Vida: ${Math.ceil(t.hp)}/${t.maxHp}`;
       status.textContent =
         t.targetKind === 'unit' ? 'Caçando humanos' : t.targetKind === 'building' ? 'Destruindo construções' : t.targetKind === 'march' ? 'Marchando para a cidade' : 'Vagando';
+      if (this.sim.intimidated.has(t.id)) status.textContent += ' — intimidado por uma lenda (-5% de vida, -10% de dano)';
     });
     this.info.append(el('div', 'bp-hint', 'Selecione soldados e clique com o botão direito no titã para atacar. Torres e o Centro da Vila (com gente dentro) atiram flechas.'));
   }
@@ -130,6 +135,7 @@ export class BottomPanel {
     }
 
     this.info.append(el('div', 'bp-hint', 'Clique direito: andar, coletar, construir, reparar, abrigar, treinar ou atacar.'));
+    if (units.length === 1 && canEnnoble(units[0])) this.commands.appendChild(this.ennobleButton(units[0]));
     if (units.some((u) => isSoldier(u))) {
       this.commands.appendChild(
         cmdButton('Formar batalhão', 'o de maior nível comanda', 'B', 'Junta os soldados selecionados num batalhão: andam e lutam juntos.', () =>
@@ -278,14 +284,53 @@ export class BottomPanel {
     const rank = el('div', 'bp-rank');
     const bar = progressBar();
     const stats = el('div', 'bp-line');
-    this.info.append(rank, bar.el, stats);
+    const glory = el('div', 'bp-line bp-lead');
+    this.info.append(rank, bar.el, stats, glory);
     this.updaters.push(() => {
-      rank.textContent = `${rankName(u.level)} · nível ${u.level}`;
+      const f = isFemaleName(u.name);
+      const titles = [u.noble ? (f ? 'Nobre dama' : 'Nobre cavaleiro') : '', isLegend(u) ? 'Lenda' : ''].filter(Boolean).join(' · ');
+      rank.textContent = `${titles ? `${titles} — ` : ''}${rankName(u.level)} · nível ${u.level}`;
+      const st = this.sim.state;
+      const n = honors(u);
+      const parts = [`Honras: ${n}/${BALANCE.honor.max}${n ? ` (+${pct(honorBonus(u))})` : ''} · ${u.kills} titãs`];
+      const total = buffFraction(st, u);
+      if (total > 0) parts.push(`Bônus total: +${pct(total)}`);
+      const sh = shieldInfo(st, u);
+      if (sh.max > 0) parts.push(`Escudo: ${Math.ceil(u.shield)}/${sh.max}`);
+      glory.textContent = parts.join(' · ');
+      const a = auraBonus(st, u);
+      glory.title = [
+        `Comando: +${pct(leadershipBonus(st, u))}`,
+        `Aura de nobre: +${pct(a.noble)}`,
+        `Aura de lenda: +${pct(a.legend)}`,
+        `Honras: +${pct(honorBonus(u))}`,
+        'Os bônus se somam sobre a vida e o ataque base.',
+      ].join('\n');
       const need = xpToNext(u.level);
       bar.set(u.level >= MAX_LEVEL ? 1 : u.xp / need);
       bar.el.title = u.level >= MAX_LEVEL ? 'Nível máximo' : `Experiência: ${Math.floor(u.xp)}/${need}`;
       stats.textContent = `Ataque ${unitAttack(this.sim.state, u).toFixed(1).replace('.', ',')}`;
     });
+  }
+
+  // Conceder título de nobreza (nível 70+): 500 de ouro e soldo diário.
+  private ennobleButton(u: Unit): HTMLButtonElement {
+    const N = BALANCE.nobility;
+    const btn = cmdButton(
+      `Nobreza: ${u.name.split(' ')[0]}`,
+      `${formatCost(N.cost)} + ${N.upkeepGold} ouro/dia`,
+      '',
+      `Título de nobreza para ${u.name}: monta a cavalo com lança dourada (+${N.lanceDamage} de dano base, +${N.extraHp} de vida base). ` +
+        `Como comandante, +${N.leadershipBonus * 100}% no bônus de comando (e o recebe também); o batalhão anda ${N.battalionSpeed * 100}% mais rápido. ` +
+        `Militares por perto recebem +${N.auraBonus * 100}% de vida e ataque. Prioridade no hospital. Como treinador, +${N.trainerXp} de experiência por segundo. ` +
+        `Se morrer, a moral cai muito.`,
+      () => {
+        const err = ennoble(this.sim, u.id);
+        if (err) this.toast(err);
+      },
+    );
+    this.updaters.push(() => btn.classList.toggle('disabled', !canAfford(this.sim, N.cost)));
+    return btn;
   }
 
   private buildBattalion(id: number): void {
@@ -304,13 +349,13 @@ export class BottomPanel {
     this.updaters.push(() => {
       const cmd = this.sim.unit(b.commanderId);
       const S = BALANCE.soldiers;
-      const pct = cmd ? Math.round(cmd.level * S.leadershipPerLevel * 1000) / 10 : 0;
+      const bonus = cmd ? cmd.level * S.leadershipPerLevel + (cmd.noble ? BALANCE.nobility.leadershipBonus : 0) : 0;
       const near = b.memberIds.filter((id) => {
         const m = this.sim.unit(id);
         return m && leadershipBonus(this.sim.state, m) > 0;
       }).length;
-      lead.textContent = `Liderança: +${String(pct).replace('.', ',')}% ataque e vida (${near}/${b.memberIds.length} perto do comandante)`;
-      lead.title = `Soldados a até ${S.leadershipRadius} tiles do comandante recebem +${S.leadershipPerLevel * 100}% por nível dele.`;
+      lead.textContent = `Liderança: +${pct(bonus)} ataque e vida (${near}/${b.memberIds.length} perto do comandante)${cmd?.noble ? ' · nobre: vale para si e +5% de velocidade' : ''}`;
+      lead.title = `Soldados a até ${S.leadershipRadius} tiles do comandante recebem +${S.leadershipPerLevel * 100}% por nível dele (comandante nobre: +${BALANCE.nobility.leadershipBonus * 100}% fixo).`;
       size.textContent = `Soldados: ${b.memberIds.length}/${cmd ? battalionCapacity(cmd.level) : 0} (+ comandante)`;
       const o = b.order;
       const modeText = { manual: 'Sob seu comando', defend: 'Defendendo a posição', hunt: 'Caçando titãs' }[b.mode];
@@ -344,6 +389,27 @@ export class BottomPanel {
     if (b.autoHospital) auto.classList.add('active-mode');
     this.commands.appendChild(auto);
 
+    // Formações (comandante a partir do nível 40).
+    const unlocked = canChooseFormation(this.sim, b);
+    const lvl = BALANCE.soldiers.formationUnlockLevel;
+    const formations: [Formation, string, string][] = [
+      ['block', 'Bloco', 'Fileiras compactas atrás do comandante.'],
+      ['line', 'Linha', 'Todos lado a lado: uma frente larga.'],
+      ['column', 'Coluna', 'Em fila indiana: passa por corredores estreitos.'],
+      ['wedge', 'Cunha', 'Um "V" com o comandante na ponta.'],
+      ['circle', 'Círculo', 'Um anel protegendo o comandante.'],
+    ];
+    for (const [f, label, title] of formations) {
+      const btn = cmdButton(label, unlocked ? 'formação' : `comandante nível ${lvl}`, '', unlocked ? title : `${title} Libera com o comandante no nível ${lvl}.`, () => {
+        const err = setFormation(this.sim, b.id, f);
+        if (err) this.toast(err);
+      });
+      if (!unlocked) btn.classList.add('disabled');
+      else if (b.formation === f) btn.classList.add('active-mode');
+      this.commands.appendChild(btn);
+    }
+    for (const u of battalionUnits(this.sim, b)) if (canEnnoble(u)) this.commands.appendChild(this.ennobleButton(u));
+
     // Membros: clicar no nome torna comandante; ✚ marca quem dispara o estado crítico.
     const list = el('div', 'bp-members wide');
     list.appendChild(el('div', 'bp-sub', 'Membros — clique no nome para tornar comandante; ✚ = dispara o estado crítico:'));
@@ -362,7 +428,8 @@ export class BottomPanel {
       name.title = u.id === b.commanderId ? 'Comandante' : 'Clique para tornar comandante';
       if (u.id !== b.commanderId) name.onclick = () => setCommander(this.sim, b.id, u.id);
       const hpEl = el('span', 'bp-hp');
-      name.append(document.createTextNode(`${u.id === b.commanderId ? '★ ' : ''}${u.name} — ${rankName(u.level)} `), hpEl);
+      const marks = `${u.id === b.commanderId ? '★ ' : ''}${u.noble ? '♛ ' : ''}${isLegend(u) ? '✦ ' : ''}`;
+      name.append(document.createTextNode(`${marks}${u.name} — ${rankName(u.level)} `), hpEl);
       this.updaters.push(() => {
         const frac = u.hp / unitMaxHp(this.sim.state, u);
         hpEl.textContent = `${Math.round(frac * 100)}%`;
@@ -564,6 +631,10 @@ export class BottomPanel {
     if (!def.gatherable) this.info.append(el('div', 'bp-hint', 'Um mistério. Talvez um dia saibamos para que servem.'));
     else this.info.append(el('div', 'bp-hint', 'Selecione aldeões e clique com o botão direito para coletar.'));
   }
+}
+
+function pct(frac: number): string {
+  return `${String(Math.round(frac * 1000) / 10).replace('.', ',')}%`;
 }
 
 function el(tag: string, cls: string, text = ''): HTMLElement {

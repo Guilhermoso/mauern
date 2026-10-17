@@ -83,12 +83,12 @@ export function moveTo(sim: Sim, u: Unit, goal: Goal, opts: MoveOptions = {}): M
 
 // Anda um passo em direção ao ponto. Retorna true se chegou.
 export function stepToward(
-  u: { x: number; y: number; facing: number; moving?: boolean; kind?: string; speedCap?: number },
+  u: { x: number; y: number; facing: number; moving?: boolean; kind?: string; speedCap?: number; speedBonus?: number },
   x: number,
   y: number,
   speed?: number,
 ): boolean {
-  let base = speed ?? UNIT_DEFS[u.kind as Unit['kind']].speed;
+  let base = speed ?? UNIT_DEFS[u.kind as Unit['kind']].speed * (1 + (u.speedBonus ?? 0));
   if (speed === undefined && u.speedCap) base = Math.min(base, u.speedCap);
   const step = base * DT;
   const dx = x - u.x;

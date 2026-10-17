@@ -29,6 +29,10 @@ interface UnitView {
   carry: Graphics;
   tool: Graphics;
   badge: Graphics;
+  mount: Graphics; // cavalo do nobre (só visual)
+  glow: Graphics; // aura dourada da lenda
+  shield: Graphics; // anel do escudo
+  noble: boolean;
   carryKey: string;
   badgeKey: string;
 }
@@ -85,6 +89,12 @@ export class EntityLayer {
     for (const u of state.units) {
       aliveU.add(u.id);
       let v = this.units.get(u.id);
+      if (v && v.noble !== u.noble) {
+        // Recebeu o título: troca o desenho (cavalo e lança dourada).
+        v.root.destroy({ children: true });
+        this.units.delete(u.id);
+        v = undefined;
+      }
       if (!v) {
         v = createUnitView(u);
         this.units.set(u.id, v);
@@ -143,6 +153,14 @@ function createUnitView(u: Unit): UnitView {
     tool.rect(0, -1, 9, 2).fill(0x6b4a2a);
     tool.rect(7, -3, 3, 6).fill(0x9aa0a6);
     tool.visible = false;
+  } else if (u.kind === 'militia' && u.noble) {
+    // Nobre: montado a cavalo (desenhado em "mount", que gira com a direção) e com lança dourada.
+    body.circle(0, -2, 6.5).fill(PLAYER_COLOR);
+    body.circle(0, -2, 6.5).stroke({ width: 1.4, color: 0xd9a441 });
+    body.circle(0, -3, 3.6).fill(0xd9a441); // elmo dourado
+    body.circle(-0.8, -3.8, 1.3).fill(0xffe9a8);
+    tool.rect(-5, -1, 22, 1.8).fill(0xb8862e);
+    tool.poly([17, -3.4, 23, 0, 17, 3.4]).fill(0xffe08a).stroke({ width: 0.6, color: 0x8a6420 });
   } else if (u.kind === 'militia') {
     body.ellipse(2, 5, 7, 4).fill({ color: 0x000000, alpha: 0.3 });
     body.circle(0, 0, 7).fill(PLAYER_COLOR);
@@ -160,8 +178,25 @@ function createUnitView(u: Unit): UnitView {
     body.circle(-1, -0.5, 2.8).fill(0xe8c39e);
   }
   const badge = new Graphics();
-  root.addChild(tool, body, carry, badge);
-  return { root, body, carry, tool, badge, carryKey: '', badgeKey: '' };
+  const mount = new Graphics();
+  if (u.kind === 'militia' && u.noble) {
+    mount.ellipse(3, 6, 14, 6).fill({ color: 0x000000, alpha: 0.3 });
+    mount.ellipse(0, 0, 13, 6).fill(0xf2efe6); // cavalo branco
+    mount.ellipse(0, 0, 13, 6).stroke({ width: 1, color: 0x9a948a });
+    mount.ellipse(12, -1, 4.5, 3.4).fill(0xe6e1d6);
+    mount.rect(-3, -6, 7, 12).fill(0x2a4f9e); // manta azul
+    mount.rect(-3, -6, 7, 12).stroke({ width: 0.8, color: 0xd9a441 });
+    mount.rect(-14, -1, 4, 2).fill(0x8a8378); // cauda
+  }
+  const glow = new Graphics();
+  glow.circle(0, 0, 13).stroke({ width: 2, color: 0xffd45a, alpha: 0.8 });
+  glow.circle(0, 0, 16).stroke({ width: 1, color: 0xffd45a, alpha: 0.35 });
+  glow.visible = false;
+  const shield = new Graphics();
+  shield.circle(0, -1, 10).stroke({ width: 1.6, color: 0x7fd8ff, alpha: 0.85 });
+  shield.visible = false;
+  root.addChild(glow, mount, tool, body, carry, shield, badge);
+  return { root, body, carry, tool, badge, mount, glow, shield, noble: u.noble, carryKey: '', badgeKey: '' };
 }
 
 // Insígnia: um ponto colorido pelo grupo de patentes, com 1 a 5 traços conforme o grau;
@@ -206,6 +241,10 @@ function updateUnitView(v: UnitView, u: Unit, timeSec: number, commander = false
     return;
   }
   if (u.kind === 'militia') {
+    v.mount.rotation = u.facing;
+    v.glow.visible = u.level >= 100;
+    if (v.glow.visible) v.glow.alpha = 0.6 + Math.sin(timeSec * 3 + u.id) * 0.3;
+    v.shield.visible = u.shield > 0;
     // A lança aponta para a frente e estoca durante o combate.
     const thrust = working ? Math.max(0, Math.sin(timeSec * 8 + u.id)) * 5 : 0;
     v.tool.rotation = u.facing;

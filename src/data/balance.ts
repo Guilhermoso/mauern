@@ -37,6 +37,40 @@ export const BALANCE = {
     maxBatch: 3, // unidades militares treinadas juntas num lote (aldeões: sempre 1)
     batchExtraTime: 0.8, // cada unidade extra do lote soma 80% do tempo de uma unidade
   },
+  // Nobreza: título concedido a soldados de nível alto.
+  nobility: {
+    minLevel: 70,
+    cost: { gold: 500 },
+    upkeepGold: 25, // ouro por dia, por nobre
+    unpaidMorale: -8, // moral quando não há ouro para pagar os nobres (por 1 dia)
+    leadershipBonus: 0.1, // +10% fixo no bônus de comando (e o nobre comandante recebe o bônus total)
+    battalionSpeed: 0.05, // +5% de velocidade para o batalhão do nobre
+    auraBonus: 0.05, // +5% de vida e ataque para os militares perto (não acumula entre nobres)
+    auraRadius: 8, // tiles
+    trainerXp: 5, // treinador nobre: +5 de experiência por segundo para os alunos e para si
+    extraHp: 50, // vida base extra
+    lanceDamage: 5, // lança dourada: +5 de dano base
+    deathMorale: -25, // morte de um nobre (por 4 dias)
+  },
+  // Honras: uma a cada 10 titãs abatidos pelo soldado.
+  honor: {
+    killsPerHonor: 10,
+    max: 10,
+    bonusPerHonor: 0.02, // +2% de vida e ataque por honra
+    maxBonus: 0.3, // com 10 honras, +30% no total
+  },
+  // Lenda: soldados que chegam ao nível 100.
+  legend: {
+    auraBonus: 0.1, // +10% de vida e ataque para os militares perto (não acumula entre lendas)
+    radius: 10, // tiles: aura e intimidação
+    titanHpReduction: 0.05, // titãs intimidados: -5% de vida base (o dano recebido conta 1/0,95)
+    titanDamageReduction: 0.1, // e -10% de dano
+    shield: 30, // escudo da lenda
+    shieldRecharge: 20, // segundos fora de combate para recarregar
+    battalionShield: 10, // escudo dos militares no batalhão da lenda
+    battalionShieldRecharge: 60,
+    trainerXp: 5, // treinador lenda: +5 de experiência por segundo para os alunos
+  },
   hospital: {
     bedsPerLevel: 20, // leitos por nível (nível máximo 5 = 100 leitos)
     maxLevel: 5,
@@ -161,6 +195,8 @@ export const BALANCE = {
     formationSpacing: 20, // px entre soldados na formação
     leadershipPerLevel: 0.005, // bônus de comando: +0,5% de ataque e vida por nível do comandante
     leadershipRadius: 8, // tiles: o bônus só vale perto do comandante
+    formationUnlockLevel: 40, // comandante a partir deste nível escolhe a formação
+    huntXpPerLevels: 20, // modo caçar: +1 de experiência por segundo a cada 20 níveis do comandante
   },
   camera: {
     minZoom: 0.35,

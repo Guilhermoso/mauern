@@ -4,7 +4,7 @@ import { MAX_LEVEL, rankName, rankTitle, xpToNext } from '../data/ranks';
 import type { Sim } from '../core/sim';
 import { addLog } from '../state';
 import type { Building, Unit, UnitOrder } from '../entities/types';
-import { unitMaxHp } from './modifiers';
+import { isLegend, unitMaxHp } from './modifiers';
 import { moveTo } from './movement';
 import { isFemaleName } from '../entities/names';
 
@@ -60,6 +60,9 @@ export function trainingRate(trainerUnit: Unit | undefined, student: Unit): numb
   if (!trainerUnit) return 0;
   let rate = S.trainingXpPerSecond * (1 + trainerUnit.level * S.trainerBonusPerLevel);
   if (student.level >= trainerUnit.level) rate *= S.aboveTrainerFactor;
+  // Treinador nobre e/ou lenda: experiência extra fixa por segundo.
+  if (trainerUnit.noble) rate += BALANCE.nobility.trainerXp;
+  if (isLegend(trainerUnit)) rate += BALANCE.legend.trainerXp;
   return rate;
 }
 
@@ -94,6 +97,8 @@ export function updateTraining(sim: Sim, u: Unit, o: TrainOrder): boolean {
   }
   u.moving = false;
   const t = trainer(sim, field);
+  // O treinador nobre também ganha a experiência extra, enquanto houver alunos.
+  if (isTrainer && t && t.noble && students.length) gainXp(sim, t, BALANCE.nobility.trainerXp * DT);
   if (!t || isTrainer) return true;
   const gain = trainingRate(t, u) * DT;
   gainXp(sim, u, gain);

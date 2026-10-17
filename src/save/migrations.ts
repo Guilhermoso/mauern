@@ -104,6 +104,13 @@ const MIGRATIONS: Record<number, Migration> = {
     buildings: save.buildings.map((b: any) => ({ ...b, doctorIds: [], upgradeProgress: -1 })),
     battalions: save.battalions.map((b: any) => ({ ...b, criticalIds: [b.commanderId], autoHospital: true, inHospital: 0 })),
   }),
+  // v7 → v8: nobreza, honras, lendas (escudos) e formações dos batalhões.
+  7: (save) => ({
+    ...save,
+    version: 8,
+    units: save.units.map((u: any) => ({ ...u, noble: false, kills: 0, shield: 0, lastCombatTick: 0, speedBonus: 0 })),
+    battalions: save.battalions.map((b: any) => ({ ...b, formation: 'block' })),
+  }),
 };
 
 export function migrate(save: any): GameState {

@@ -1,6 +1,7 @@
 import { BALANCE } from '../data/balance';
 import { BUILDING_DEFS, UNIT_DEFS } from '../data/defs';
 import { CHRONICLES } from '../data/chronicles';
+import { MAX_LEVEL } from '../data/ranks';
 import { TECH_DEFS, type Effects, type ModKey, type TechId } from '../data/techs';
 import type { GameState } from '../state';
 import type { Building, Unit } from '../entities/types';
@@ -57,27 +58,113 @@ function levelBonus(u: Unit, perLevel: number): number {
   return UNIT_DEFS[u.kind].military ? 1 + perLevel * ((u.level ?? 1) - 1) : 1;
 }
 
+export function levelBonusOf(u: Unit): number {
+  return levelBonus(u, BALANCE.soldiers.hpPerLevel);
+}
+
+// Lenda: soldado no nível máximo.
+export function isLegend(u: Unit): boolean {
+  return UNIT_DEFS[u.kind].military && u.level >= MAX_LEVEL;
+}
+
+// Honras: uma a cada 10 titãs abatidos, até 10.
+export function honors(u: Unit): number {
+  const H = BALANCE.honor;
+  return Math.min(H.max, Math.floor((u.kills ?? 0) / H.killsPerHonor));
+}
+
+export function honorBonus(u: Unit): number {
+  const H = BALANCE.honor;
+  const n = honors(u);
+  return n >= H.max ? H.maxBonus : n * H.bonusPerHonor;
+}
+
+// Os dois estão no mesmo lugar: dentro do mesmo edifício, ou ambos fora e perto.
+function together(a: Unit, b: Unit, radiusTiles: number): boolean {
+  if (a.garrison || b.garrison) return !!a.garrison && a.garrison === b.garrison;
+  return Math.hypot(a.x - b.x, a.y - b.y) <= radiusTiles * BALANCE.world.tileSize;
+}
+
+// Nobres e lendas do momento (poucos): recalculados uma vez por passo.
+const notables = new WeakMap<GameState, { tick: number; len: number; nobles: Unit[]; legends: Unit[] }>();
+
+export function notableUnits(state: GameState): { nobles: Unit[]; legends: Unit[] } {
+  const hit = notables.get(state);
+  if (hit && hit.tick === state.tick && hit.len === state.units.length) return hit;
+  const nobles: Unit[] = [];
+  const legends: Unit[] = [];
+  for (const u of state.units) {
+    if (!UNIT_DEFS[u.kind].military) continue;
+    if (u.noble) nobles.push(u);
+    if (u.level >= MAX_LEVEL) legends.push(u);
+  }
+  const out = { tick: state.tick, len: state.units.length, nobles, legends };
+  notables.set(state, out);
+  return out;
+}
+
+// Esquece o cache (depois de conceder um título, por exemplo).
+export function invalidateNotables(state: GameState): void {
+  notables.delete(state);
+}
+
 // Bônus de comando: membros de batalhão perto do comandante ficam mais fortes conforme o nível dele.
-// Retorna a fração extra (0,1 = +10%).
+// Comandante nobre: +10% fixo, e ele mesmo recebe o bônus total. Retorna a fração extra (0,1 = +10%).
 export function leadershipBonus(state: GameState, u: Unit): number {
   if (!u.battalion) return 0;
   const b = state.battalions.find((x) => x.id === u.battalion);
-  if (!b || b.commanderId === u.id) return 0;
-  const c = state.units.find((x) => x.id === b.commanderId);
-  if (!c) return 0;
+  if (!b) return 0;
   const S = BALANCE.soldiers;
-  const inRange = u.garrison && u.garrison === c.garrison ? true : !u.garrison && !c.garrison && Math.hypot(c.x - u.x, c.y - u.y) <= S.leadershipRadius * BALANCE.world.tileSize;
-  return inRange ? c.level * S.leadershipPerLevel : 0;
+  const N = BALANCE.nobility;
+  if (b.commanderId === u.id) return u.noble ? u.level * S.leadershipPerLevel + N.leadershipBonus : 0;
+  const c = state.units.find((x) => x.id === b.commanderId);
+  if (!c || !together(u, c, S.leadershipRadius)) return 0;
+  return c.level * S.leadershipPerLevel + (c.noble ? N.leadershipBonus : 0);
+}
+
+// Auras de nobres e lendas próximos (de outros: cada tipo de aura vale uma vez só).
+export function auraBonus(state: GameState, u: Unit): { noble: number; legend: number } {
+  if (!UNIT_DEFS[u.kind].military) return { noble: 0, legend: 0 };
+  const { nobles, legends } = notableUnits(state);
+  const N = BALANCE.nobility;
+  const L = BALANCE.legend;
+  return {
+    noble: nobles.some((n) => n !== u && together(u, n, N.auraRadius)) ? N.auraBonus : 0,
+    legend: legends.some((l) => l !== u && together(u, l, L.radius)) ? L.auraBonus : 0,
+  };
+}
+
+// Soma de todos os bônus percentuais de vida e ataque. Eles se somam e valem sempre sobre os
+// valores base (com o nível), nunca sobre valores já aumentados por outro bônus.
+export function buffFraction(state: GameState, u: Unit): number {
+  if (!UNIT_DEFS[u.kind].military) return 0;
+  const a = auraBonus(state, u);
+  return leadershipBonus(state, u) + a.noble + a.legend + honorBonus(u);
+}
+
+export function unitBaseHp(state: GameState, u: Unit): number {
+  const extra = (u.kind === 'militia' ? flat(state, 'militiaHp') : 0) + (u.noble ? BALANCE.nobility.extraHp : 0);
+  return (UNIT_DEFS[u.kind].maxHp + extra) * levelBonus(u, BALANCE.soldiers.hpPerLevel);
 }
 
 export function unitMaxHp(state: GameState, u: Unit): number {
-  const base = UNIT_DEFS[u.kind].maxHp + (u.kind === 'militia' ? flat(state, 'militiaHp') : 0);
-  return Math.round(base * levelBonus(u, BALANCE.soldiers.hpPerLevel) * (1 + leadershipBonus(state, u)));
+  return Math.round(unitBaseHp(state, u) * (1 + buffFraction(state, u)));
 }
 
 export function unitAttack(state: GameState, u: Unit): number {
-  const base = UNIT_DEFS[u.kind].attack + (u.kind === 'militia' ? flat(state, 'militiaAttack') : 0);
-  return base * levelBonus(u, BALANCE.soldiers.attackPerLevel) * (1 + leadershipBonus(state, u));
+  const extra = (u.kind === 'militia' ? flat(state, 'militiaAttack') : 0) + (u.noble ? BALANCE.nobility.lanceDamage : 0);
+  const base = (UNIT_DEFS[u.kind].attack + extra) * levelBonus(u, BALANCE.soldiers.attackPerLevel);
+  return base * (1 + buffFraction(state, u));
+}
+
+// Escudo máximo: a lenda tem o seu; os militares no batalhão de uma lenda, um menor.
+export function shieldInfo(state: GameState, u: Unit): { max: number; recharge: number } {
+  const L = BALANCE.legend;
+  if (isLegend(u)) return { max: L.shield, recharge: L.shieldRecharge };
+  if (u.battalion && notableUnits(state).legends.some((l) => l !== u && l.battalion === u.battalion)) {
+    return { max: L.battalionShield, recharge: L.battalionShieldRecharge };
+  }
+  return { max: 0, recharge: 0 };
 }
 
 export function carryCapacity(state: GameState, u: Unit): number {

@@ -9,6 +9,13 @@ import { clearPath } from './movement';
 // Dano, morte e destruição: funções compartilhadas por titãs, combate e comandos do jogador.
 
 export function damageUnit(sim: Sim, u: Unit, amount: number, byTitan: boolean): void {
+  u.lastCombatTick = sim.state.tick;
+  // O escudo (lendas e seu batalhão) absorve o golpe primeiro.
+  if (u.shield > 0) {
+    const absorbed = Math.min(u.shield, amount);
+    u.shield -= absorbed;
+    amount -= absorbed;
+  }
   u.hp -= amount;
   if (u.hp <= 0) killUnit(sim, u, byTitan ? ['devorado por um titã', 'devorada por um titã'] : ['morto', 'morta']);
 }
@@ -21,6 +28,10 @@ export function killUnit(sim: Sim, u: Unit, cause: [string, string]): void {
   sim.state.stats.deaths++;
   addMoraleMod(sim, 'Morte de um morador', BALANCE.morale.deathPenalty, 48);
   const f = isFemaleName(u.name);
+  if (u.noble) {
+    addMoraleMod(sim, f ? 'Morte de uma nobre' : 'Morte de um nobre', BALANCE.nobility.deathMorale, 96);
+    addLog(sim.state, `O povo está de luto: ${f ? 'a nobre' : 'o nobre'} ${u.name} caiu.`);
+  }
   const text = `${f ? 'A' : 'O'} ${unitNoun(u.kind, f).toLowerCase()} ${u.name} foi ${f ? cause[1] : cause[0]}.`;
   addLog(sim.state, text);
   sim.alerts.push({ kind: 'death', text, x: u.x, y: u.y });

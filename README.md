@@ -30,6 +30,17 @@ o nível do treinador, mais rápido os outros aprendem; ele também ganha experi
 soldados cabem. O batalhão anda em formação, é selecionado como um só e pode ficar no modo manual, defender
 uma posição ou caçar titãs pelo mapa. O comandante dá um **bônus de liderança**: soldados a até 8 tiles dele
 ganham +0,5% de ataque e vida por nível do comandante (nível 20 = +10%, nível 100 = +50%).
+No modo caçar, todo o batalhão ganha 1 de experiência por segundo a cada 20 níveis do comandante. A partir do
+nível 40, o comandante libera as **formações**: bloco, linha, coluna, cunha e círculo.
+
+**Honras, nobreza e lendas:** a cada 10 titãs abatidos o soldado ganha uma **honra** (+2% de vida e ataque cada,
+até 10; com 10 honras, +30%). Militares de nível 70+ podem receber um **título de nobreza** (500 de ouro + 25
+por dia): montam a cavalo com lança dourada (+5 de dano e +50 de vida base), dão +5% de vida e ataque aos
+militares por perto, aceleram o próprio batalhão em 5%, somam +10% ao bônus de comando (e o recebem também),
+têm prioridade no hospital e, como treinadores, dão +5 de experiência por segundo. Se um nobre morrer, a moral
+despenca. No nível 100 o soldado vira **lenda**: +10% de vida e ataque para os militares por perto, intimida os
+titãs ao redor (-5% de vida e -10% de dano), tem um escudo de 30 (recarrega após 20 s fora de combate) e dá um
+escudo de 10 ao seu batalhão (recarrega após 60 s). Todos os bônus se somam sempre sobre os valores base.
 
 **Treino em lotes:** unidades militares treinam em lotes de até 3, como no Age of Empires III — cada clique soma
 uma unidade ao lote, Shift+clique enfileira um lote cheio, e o lote sai junto (mais rápido do que um por um).

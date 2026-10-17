@@ -11,6 +11,7 @@ import { updateEvents } from '../systems/events';
 import { updateBattalions } from '../systems/battalions';
 import { updateFear, updateTerror } from '../systems/refuge';
 import { updateHospitals } from '../systems/hospital';
+import { payNobles, updateValor } from '../systems/nobility';
 
 // Um passo fixo da simulação. Não depende da renderização.
 export function step(sim: Sim): void {
@@ -20,6 +21,7 @@ export function step(sim: Sim): void {
   const after = getClock(state.tick);
 
   updateThreat(sim);
+  updateValor(sim);
   updateProduction(sim);
   updateBattalions(sim);
   updateFear(sim);
@@ -34,6 +36,7 @@ export function step(sim: Sim): void {
   sim.syncRng();
 
   if (after.day !== before.day) {
+    payNobles(sim);
     const seasonChanged = after.seasonIndex !== before.seasonIndex;
     addLog(state, `Dia ${after.day} amanhece${seasonChanged ? ` — começa ${after.season === 'Verão' ? 'o' : 'a'} ${after.season}` : ''}.`);
   }
