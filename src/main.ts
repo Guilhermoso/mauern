@@ -71,7 +71,7 @@ async function boot(): Promise<void> {
   const entities = new EntityLayer();
   const overlay = new OverlayLayer();
   const fx = new FxLayer();
-  world.addChild(terrain.container, overlay.under, entities.container, fx.g, overlay.over);
+  world.addChild(terrain.container, entities.shadows, overlay.under, entities.container, fx.g, overlay.over);
   const lighting = new Lighting();
   app.stage.addChild(world, lighting.overlay, overlay.screen);
 

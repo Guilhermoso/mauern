@@ -1,11 +1,11 @@
-import { Container, Graphics } from 'pixi.js';
+import { AlphaFilter, Container, Graphics } from 'pixi.js';
 import { BALANCE } from '../data/balance';
 import { BUILDING_DEFS } from '../data/defs';
 import type { Sim } from '../core/sim';
 import type { Building, ResourceKind, Unit } from '../entities/types';
 import { PLAYER_COLOR } from './colors';
 import { daylight, getClock } from '../core/time';
-import { drawBuildingArt, NEIGHBOR_DIRS, type BuildingArt } from './buildingArt';
+import { drawBuildingArt, NEIGHBOR_DIRS, type BuildingArt, type Caster } from './buildingArt';
 import { createTitanView, updateTitanView, type TitanView } from './titanArt';
 
 // Desenha edifícios, unidades e titãs. Cada entidade tem uma view criada uma vez e atualizada a cada quadro;
@@ -22,6 +22,8 @@ const CARRY_COLORS: Record<ResourceKind, number> = {
 interface BuildingView {
   art: BuildingArt;
   key: string;
+  shadow: Graphics | null; // sombra no chão (na camada de sombras)
+  shadowKey: string;
 }
 
 interface UnitView {
@@ -43,12 +45,17 @@ const BADGE_COLORS = [0xb07a45, 0xc0c4c8, 0xe8c24a, 0x6fc3e8, 0xe0504a];
 
 export class EntityLayer {
   readonly container = new Container();
+  // Sombras dos edifícios: desenhadas opacas e com transparência aplicada à camada inteira, para que
+  // sombras sobrepostas não escureçam em dobro. Fica abaixo de todos os edifícios e unidades.
+  readonly shadows = new Container();
+  private shadowAlpha = new AlphaFilter({ alpha: 0.3 });
   private buildings = new Map<number, BuildingView>();
   private units = new Map<number, UnitView>();
   private titans = new Map<number, TitanView>();
 
   constructor() {
     this.container.sortableChildren = true;
+    this.shadows.filters = [this.shadowAlpha];
   }
 
   sync(sim: Sim, timeSec: number): void {
@@ -56,6 +63,9 @@ export class EntityLayer {
     const ts = BALANCE.world.tileSize;
     const aliveB = new Set<number>();
     const sun = sunShadow(state.tick);
+    this.shadowAlpha.alpha = sun.alpha;
+    this.shadows.visible = sun.alpha > 0.01;
+    const sunKey = `${Math.round(sun.dx)},${Math.round(sun.dy)}`;
     for (const b of state.buildings) {
       aliveB.add(b.id);
       const def = BUILDING_DEFS[b.kind];
@@ -64,18 +74,27 @@ export class EntityLayer {
       const key = `${b.built}|${Math.floor(p * 10)}|${mask}|${b.level}`;
       let v = this.buildings.get(b.id);
       if (!v || v.key !== key) {
-        if (v) v.art.root.destroy({ children: true });
-        v = { art: drawBuildingArt(b.kind, b.built, p, mask, b.level), key };
+        if (v) {
+          v.art.root.destroy({ children: true });
+          v.shadow?.destroy();
+        }
+        const art = drawBuildingArt(b.kind, b.built, p, mask, b.level);
+        let shadow: Graphics | null = null;
+        if (art.casters?.length) {
+          shadow = new Graphics();
+          shadow.position.set(b.tx * ts, b.ty * ts);
+          this.shadows.addChild(shadow);
+        }
+        v = { art, key, shadow, shadowKey: '' };
         v.art.root.position.set(b.tx * ts, b.ty * ts);
         this.buildings.set(b.id, v);
         this.container.addChild(v.art.root);
       }
       // Edifícios que se pode atravessar (fazenda, campo de treinamento) ficam sempre por baixo das unidades.
       v.art.root.zIndex = def.walkable ? -1e6 + b.ty : (b.ty + def.size) * ts;
-      if (v.art.shadow) {
-        const h = (v.art.shadowHeight ?? 8) / 8;
-        v.art.shadow.position.set(sun.dx * h, sun.dy * h);
-        v.art.shadow.alpha = sun.alpha;
+      if (v.shadow && this.shadows.visible && v.shadowKey !== sunKey) {
+        v.shadowKey = sunKey;
+        drawShadow(v.shadow, v.art.casters!, sun.dx, sun.dy);
       }
       if (v.art.blades) v.art.blades.rotation = timeSec * 0.6 + b.id;
       if (v.art.flame) {
@@ -88,6 +107,7 @@ export class EntityLayer {
     for (const [id, v] of this.buildings) {
       if (!aliveB.has(id)) {
         v.art.root.destroy({ children: true });
+        v.shadow?.destroy();
         this.buildings.delete(id);
       }
     }
@@ -152,8 +172,42 @@ function sunShadow(tick: number): { dx: number; dy: number; alpha: number } {
   return {
     dx: -Math.cos(angle) * len,
     dy: 4 + 3 * (1 - elevation), // o sol passa um pouco ao sul: a sombra pende para o norte… e para baixo na tela
-    alpha: 0.25 + 0.75 * light * (0.55 + 0.45 * elevation),
+    // Some no escuro: assim a sombra não "pula" de leste para oeste durante a noite.
+    alpha: 0.34 * light * (0.6 + 0.4 * elevation),
   };
+}
+
+// Sombra projetada: o contorno que envolve a forma do edifício e a mesma forma deslocada pelo sol
+// (proporcional à altura). Assim ela sai das paredes, como uma sombra de verdade.
+function drawShadow(g: Graphics, casters: Caster[], dx: number, dy: number): void {
+  g.clear();
+  for (const c of casters) {
+    const k = c.h / 8;
+    const pts: [number, number][] = [];
+    for (let i = 0; i < c.pts.length; i += 2) {
+      pts.push([c.pts[i], c.pts[i + 1]]);
+      pts.push([c.pts[i] + dx * k, c.pts[i + 1] + dy * k]);
+    }
+    g.poly(convexHull(pts).flat()).fill(0x000000);
+  }
+}
+
+// Envoltória convexa (cadeia monótona).
+function convexHull(points: [number, number][]): [number, number][] {
+  const p = [...points].sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+  const cross = (o: number[], a: number[], b: number[]) => (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
+  const lower: [number, number][] = [];
+  for (const q of p) {
+    while (lower.length >= 2 && cross(lower[lower.length - 2], lower[lower.length - 1], q) <= 0) lower.pop();
+    lower.push(q);
+  }
+  const upper: [number, number][] = [];
+  for (let i = p.length - 1; i >= 0; i--) {
+    const q = p[i];
+    while (upper.length >= 2 && cross(upper[upper.length - 2], upper[upper.length - 1], q) <= 0) upper.pop();
+    upper.push(q);
+  }
+  return lower.slice(0, -1).concat(upper.slice(0, -1));
 }
 
 function wallMask(sim: Sim, b: Building): number {

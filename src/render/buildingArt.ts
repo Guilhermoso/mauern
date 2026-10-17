@@ -7,10 +7,40 @@ import { PLAYER_COLOR, shade } from './colors';
 // Desenho dos edifícios vistos de cima. Coordenadas locais: (0,0) = canto superior esquerdo.
 // Retorna também partes animadas (ex.: pás do moinho).
 
+// Parte do edifício que projeta sombra: um polígono convexo (coordenadas locais, x,y alternados)
+// e a altura relativa (8 = uma casa). A sombra é calculada pela camada de entidades conforme o sol.
+export interface Caster {
+  pts: number[];
+  h: number;
+}
+
+export function rectCaster(x: number, y: number, w: number, h: number, height: number): Caster {
+  return { pts: [x, y, x + w, y, x + w, y + h, x, y + h], h: height };
+}
+
+export function circleCaster(cx: number, cy: number, r: number, height: number): Caster {
+  const pts: number[] = [];
+  for (let i = 0; i < 16; i++) pts.push(cx + Math.cos((i / 16) * Math.PI * 2) * r, cy + Math.sin((i / 16) * Math.PI * 2) * r);
+  return { pts, h: height };
+}
+
+// Faixa (fileira de troncos) de (x0,y0) a (x1,y1) com meia-largura r.
+function stripCaster(x0: number, y0: number, x1: number, y1: number, r: number, height: number): Caster {
+  const len = Math.hypot(x1 - x0, y1 - y0) || 1;
+  const ux = (x1 - x0) / len;
+  const uy = (y1 - y0) / len;
+  const nx = -uy * r;
+  const ny = ux * r;
+  const ax = x0 - ux * r;
+  const ay = y0 - uy * r;
+  const bx = x1 + ux * r;
+  const by = y1 + uy * r;
+  return { pts: [ax + nx, ay + ny, bx + nx, by + ny, bx - nx, by - ny, ax - nx, ay - ny], h: height };
+}
+
 export interface BuildingArt {
   root: Container;
-  shadow?: Graphics; // sombra no chão, movida conforme a posição do sol
-  shadowHeight?: number; // "altura" do edifício: quanto a sombra se estende
+  casters?: Caster[]; // partes que projetam sombra
   blades?: Graphics;
   flame?: Graphics;
 }
@@ -63,11 +93,6 @@ function logRow(g: Graphics, x0: number, y0: number, x1: number, y1: number): vo
   for (let i = 0; i <= n; i++) {
     const x = x0 + ((x1 - x0) * i) / n;
     const y = y0 + ((y1 - y0) * i) / n;
-    g.circle(x + 2, y + 3, 4.6).fill({ color: 0x000000, alpha: 0.18 });
-  }
-  for (let i = 0; i <= n; i++) {
-    const x = x0 + ((x1 - x0) * i) / n;
-    const y = y0 + ((y1 - y0) * i) / n;
     g.circle(x, y, 4.6).fill(0x7a5230).stroke({ width: 1, color: 0x4a301a });
     g.circle(x - 0.8, y - 0.8, 2.2).fill(0xb3854f);
   }
@@ -80,15 +105,20 @@ function drawPalisade(mask: number, ts: number): BuildingArt {
   root.addChild(g);
   const c = ts / 2;
   let any = false;
+  const casters: Caster[] = [];
   NEIGHBOR_DIRS.forEach(([dx, dy], i) => {
     if (!(mask & (1 << i))) return;
     // Diagonais só se não houver ligação ortogonal fazendo o mesmo caminho.
     if (i >= 4 && (mask & (1 << (dy < 0 ? 0 : 2)) || mask & (1 << (dx > 0 ? 1 : 3)))) return;
     any = true;
     logRow(g, c, c, c + dx * c, c + dy * c);
+    casters.push(stripCaster(c, c, c + dx * c, c + dy * c, 4.6, 5));
   });
-  if (!any) logRow(g, c - 6, c, c + 6, c);
-  return { root };
+  if (!any) {
+    logRow(g, c - 6, c, c + 6, c);
+    casters.push(stripCaster(c - 6, c, c + 6, c, 4.6, 5));
+  }
+  return { root, casters };
 }
 
 // Portão: dois pilares e folhas de madeira, na direção da muralha.
@@ -98,6 +128,7 @@ function drawGate(mask: number, ts: number): BuildingArt {
   root.addChild(g);
   const vertical = (mask & 0b0101) !== 0 && (mask & 0b1010) === 0;
   const post = 0x8e8172;
+  const casters = [vertical ? rectCaster(ts / 2 - 8, -3, 16, ts + 6, 6) : rectCaster(-3, ts / 2 - 8, ts + 6, 16, 6)];
   if (vertical) {
     g.rect(ts / 2 - 7, 0, 14, ts).fill(0x6b4a2a);
     for (let y = 3; y < ts; y += 5) g.rect(ts / 2 - 7, y, 14, 1.2).fill(0x4a301a);
@@ -109,25 +140,18 @@ function drawGate(mask: number, ts: number): BuildingArt {
     g.rect(-3, ts / 2 - 8, 7, 16).fill(post);
     g.rect(ts - 4, ts / 2 - 8, 7, 16).fill(post);
   }
-  return { root };
+  return { root, casters };
 }
 
 function drawFinished(kind: BuildingKind, size: number, level = 1): BuildingArt {
   const root = new Container();
-  const sh = new Graphics();
   const g = new Graphics();
-  root.addChild(sh, g);
-  // A sombra fica numa camada própria, com a forma do edifício; quem a desloca é a camada de
-  // entidades, conforme a hora do dia. "off" vira a altura relativa do edifício.
-  let shadowHeight = 0;
-  const shadow = (_g: Graphics, s: number, off = 8): void => {
-    const inset = (size - s) / 2;
-    sh.rect(inset, inset, s, s).fill({ color: 0x000000, alpha: 0.28 });
-    shadowHeight = off;
-  };
+  root.addChild(g);
+  // Partes altas do edifício (projetam sombra; o resto é chão: pátios, cercas baixas, canteiros).
+  const casters: Caster[] = [];
   switch (kind) {
     case 'townCenter': {
-      shadow(g, size, 10);
+      casters.push(rectCaster(0, 0, size, size, 10));
       g.rect(0, 0, size, size).fill(0x9b9284);
       g.rect(4, 4, size - 8, size - 8).fill(0x8a8174);
       const m = 10;
@@ -150,7 +174,7 @@ function drawFinished(kind: BuildingKind, size: number, level = 1): BuildingArt 
     case 'house': {
       if (level <= 1) {
         // Barraca: lona esticada sobre estacas.
-        shadow(g, size - 16, 8);
+        casters.push(rectCaster(6, 8, size - 12, size - 16, 5));
         const cloth = 0xc8b48a;
         g.poly([6, 8, size - 6, 8, size - 6, size / 2]).fill(shade(cloth, 1.08));
         g.poly([6, 8, 6, size / 2, size - 6, size / 2]).fill(shade(cloth, 1.0));
@@ -164,7 +188,7 @@ function drawFinished(kind: BuildingKind, size: number, level = 1): BuildingArt 
         break;
       }
       const stone = level >= 3;
-      shadow(g, size - 8, 8);
+      casters.push(rectCaster(0, 2, size, size - 4, stone ? 9 : 8));
       const roof = stone ? 0x4f5866 : 0x9c4a2e;
       g.rect(2, 4, size - 4, size - 8).fill(stone ? 0x9a948a : 0x7a5634); // paredes
       // Telhado de duas águas com cumeeira horizontal
@@ -185,7 +209,7 @@ function drawFinished(kind: BuildingKind, size: number, level = 1): BuildingArt 
     }
     case 'hospital': {
       // Pavilhão de pedra clara com telhado de duas águas e uma cruz vermelha.
-      shadow(g, size - 8, 8);
+      casters.push(rectCaster(0, 2, size, size - 4, 8));
       g.rect(2, 4, size - 4, size - 8).fill(0xd8d2c4);
       const roof = 0x8c4a3a;
       g.rect(0, 2, size, size / 2 - 2).fill(shade(roof, 1.12));
@@ -200,7 +224,7 @@ function drawFinished(kind: BuildingKind, size: number, level = 1): BuildingArt 
     }
     case 'refuge': {
       // Paliçada fechada com um galpão coberto e uma bandeira branca no mastro.
-      shadow(g, size - 8, 8);
+      casters.push(rectCaster(12, 14, size - 24, size - 30, 6)); // o galpão (a cerca é baixa)
       g.rect(2, 2, size - 4, size - 4).fill(0x8a7a5a);
       g.rect(2, 2, size - 4, size - 4).stroke({ width: 4, color: 0x6b4a2a });
       for (let i = 4; i < size - 2; i += 6) {
@@ -235,7 +259,7 @@ function drawFinished(kind: BuildingKind, size: number, level = 1): BuildingArt 
       break;
     }
     case 'well': {
-      g.ellipse(18, 20, 13, 9).fill({ color: 0x000000, alpha: 0.25 });
+      casters.push(circleCaster(16, 16, 12, 3));
       g.circle(16, 16, 12).fill(0x8e877b);
       g.circle(16, 16, 12).stroke({ width: 2, color: 0x6a645a });
       g.circle(16, 16, 7.5).fill(0x2f5d86);
@@ -266,10 +290,10 @@ function drawFinished(kind: BuildingKind, size: number, level = 1): BuildingArt 
       flame.circle(0, -1.5, 2).fill({ color: 0xfff1b0 });
       flame.position.set(c, c);
       root.addChild(flame);
-      return { root, flame, shadow: sh, shadowHeight };
+      return { root, flame, casters };
     }
     case 'lumberCamp': {
-      shadow(g, size - 8, 8);
+      casters.push(rectCaster(0, 0, size, size * 0.55, 7)); // só o galpão; a pilha de toras fica no chão
       const roof = 0x7a5a3a;
       g.rect(0, 0, size, size * 0.55).fill(shade(roof, 1.1));
       g.rect(0, size * 0.55 - 3, size, 3).fill(shade(roof, 0.6));
@@ -286,7 +310,7 @@ function drawFinished(kind: BuildingKind, size: number, level = 1): BuildingArt 
       break;
     }
     case 'miningCamp': {
-      shadow(g, size - 8, 8);
+      casters.push(rectCaster(0, 0, size, size * 0.55, 7)); // só o galpão; o pátio de pedras fica no chão
       const roof = 0x5f6670;
       g.rect(0, 0, size, size * 0.55).fill(shade(roof, 1.15));
       g.rect(0, size * 0.55 - 3, size, 3).fill(shade(roof, 0.6));
@@ -300,7 +324,7 @@ function drawFinished(kind: BuildingKind, size: number, level = 1): BuildingArt 
       break;
     }
     case 'mill': {
-      shadow(g, size - 12, 10);
+      casters.push(circleCaster(size / 2, size / 2, size / 2 - 4, 12));
       g.circle(size / 2, size / 2, size / 2 - 4).fill(0xb8a888);
       g.circle(size / 2, size / 2, size / 2 - 10).fill(0x8e5a36);
       g.circle(size / 2, size / 2, 7).fill(0x6b4428);
@@ -315,10 +339,10 @@ function drawFinished(kind: BuildingKind, size: number, level = 1): BuildingArt 
       }
       blades.position.set(size / 2, size / 2);
       root.addChild(blades);
-      return { root, blades, shadow: sh, shadowHeight };
+      return { root, blades, casters };
     }
     case 'watchTower': {
-      shadow(g, size - 10, 12);
+      casters.push(rectCaster(6, 6, size - 12, size - 12, 16));
       g.rect(6, 6, size - 12, size - 12).fill(0x7d7468);
       g.rect(10, 10, size - 20, size - 20).fill(0x6b4a2a);
       // Telhado em pirâmide
@@ -346,5 +370,5 @@ function drawFinished(kind: BuildingKind, size: number, level = 1): BuildingArt 
       break;
     }
   }
-  return { root, shadow: sh, shadowHeight };
+  return { root, casters };
 }
