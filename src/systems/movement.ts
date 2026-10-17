@@ -45,8 +45,10 @@ export function moveTo(sim: Sim, u: Unit, goal: Goal): MoveResult {
       }
       return 'moving';
     }
+    // Atenção: guardar antes de limpar (clearPath marca o caminho como completo).
+    const complete = u.pathComplete;
     clearPath(u);
-    return u.pathComplete ? 'arrived' : 'unreachable';
+    return complete ? 'arrived' : 'unreachable';
   }
 
   const w = sim.nav.width;

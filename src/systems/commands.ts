@@ -5,7 +5,7 @@ import { addLog, newBuilding } from '../state';
 import type { Building, BuildingKind, ResourceKind, Unit, UnitKind } from '../entities/types';
 import { TILE_INFO } from '../world/terrain';
 import { getTile } from '../world/world';
-import { farmTaken } from './queries';
+import { farmTaken, findNearestNode, isExposed } from './queries';
 import { setOrder } from './units';
 import { ejectGarrison, removeBuilding, titanRadius } from './damage';
 
@@ -63,9 +63,13 @@ export function commandMove(sim: Sim, ids: readonly number[], tx: number, ty: nu
 }
 
 export function commandGather(sim: Sim, ids: readonly number[], nodeId: number): string | null {
-  const node = sim.node(nodeId);
+  let node = sim.node(nodeId);
   if (!node) return 'Recurso não encontrado.';
   if (!NODE_DEFS[node.kind].gatherable) return 'Ainda não sabemos aproveitar estes cristais.';
+  // Recurso cercado (ex.: árvore no meio da floresta): vai para o vizinho igual mais próximo que dá para alcançar.
+  if (!isExposed(sim, node)) {
+    node = findNearestNode(sim, node.kind, node.tx, node.ty, BALANCE.units.nodeSearchRadius) ?? node;
+  }
   for (const u of units(sim, ids)) {
     if (!UNIT_DEFS[u.kind].canGather) {
       commandMove(sim, [u.id], node.tx, node.ty);

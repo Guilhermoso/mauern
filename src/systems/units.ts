@@ -146,9 +146,10 @@ function updateGather(sim: Sim, u: Unit, o: GatherOrder): void {
 
   const r = moveTo(sim, u, { x0: node.tx, y0: node.ty, x1: node.tx, y1: node.ty, adjacent: true });
   if (r === 'unreachable') {
+    // Depois de várias tentativas sem conseguir chegar (ex.: preso atrás de uma paliçada), desiste.
     o.avoid.push(node.id);
-    if (o.avoid.length > 8) o.avoid.shift();
     o.nodeId = -1;
+    if (o.avoid.length >= 5) setIdle(u);
     return;
   }
   if (r === 'moving') return;

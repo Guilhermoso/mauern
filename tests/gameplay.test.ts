@@ -66,6 +66,37 @@ describe('coleta', () => {
     expect(sim.terrainChanges.length).toBeGreaterThan(0);
   });
 
+  // Regressão: ferro cercado por outras jazidas travava o jogo (o aldeão recalculava o caminho
+  // pelo mapa inteiro a cada passo e "coletava" de longe).
+  function ironCluster() {
+    const s = flatGame();
+    const nodes = [];
+    for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) nodes.push(addNode(s, 'iron', CENTER + 10 + dx, CENTER + dy, 400));
+    const vs = Array.from({ length: 15 }, (_, i) => addVillager(s, CENTER + 6, CENTER + 4 + (i % 5)));
+    return { s, center: nodes[4], vs };
+  }
+
+  it('mandar coletar um recurso cercado redireciona para um vizinho acessível', () => {
+    const { s, center, vs } = ironCluster();
+    const sim = new Sim(s);
+    commandGather(sim, vs.map((v) => v.id), center.id);
+    for (const v of vs) expect(v.order.type === 'gather' && v.order.nodeId).not.toBe(center.id);
+  });
+
+  it('um destino inalcançável é abandonado, sem travar o jogo nem coletar de longe', () => {
+    const { s, center, vs } = ironCluster();
+    s.resources.wood = 500;
+    const sim = new Sim(s);
+    // Ordem direta para o ferro central (sem o redirecionamento do comando).
+    for (const v of vs) v.order = { type: 'gather', nodeId: center.id, nodeKind: 'iron', tx: center.tx, ty: center.ty, phase: 'collect', avoid: [] };
+    const t0 = performance.now();
+    runSeconds(sim, 30);
+    const msPerTick = (performance.now() - t0) / (30 * 20);
+    expect(msPerTick).toBeLessThan(5);
+    expect(center.amount).toBe(400);
+    for (const v of vs) expect(v.order.type === 'gather' && v.order.nodeId).not.toBe(center.id);
+  });
+
   it('cristais ainda não podem ser coletados', () => {
     const s = flatGame();
     const c = addNode(s, 'crystal', CENTER + 6, CENTER);
@@ -186,5 +217,29 @@ describe('treino', () => {
     s.resources.food = 10;
     const sim = new Sim(s);
     expect(trainUnit(sim, s.buildings[0].id, 'villager')).toMatch(/insuficientes/);
+  });
+});
+
+describe('aldeão preso', () => {
+  it('desiste de recursos que não consegue alcançar, em vez de tentar para sempre', async () => {
+    const { newBuilding } = await import('../src/state');
+    const s = flatGame();
+    const u = addVillager(s, CENTER + 10, CENTER + 10);
+    // Cerca o aldeão com paliçada (sem portão).
+    const sim = new Sim(s);
+    for (let x = CENTER + 8; x <= CENTER + 12; x++) {
+      for (let y = CENTER + 8; y <= CENTER + 12; y++) {
+        if (x === CENTER + 8 || x === CENTER + 12 || y === CENTER + 8 || y === CENTER + 12) {
+          const b = newBuilding(sim.nextId(), 'palisade', x, y, true);
+          s.buildings.push(b);
+          sim.occupyBuilding(b);
+        }
+      }
+    }
+    for (let i = 0; i < 8; i++) addNode(s, 'tree', CENTER + 16 + i, CENTER + 10);
+    const sim2 = new Sim(s);
+    commandGather(sim2, [u.id], s.world.resourceNodes[0].id);
+    runSeconds(sim2, 20);
+    expect(u.order.type).toBe('idle');
   });
 });
