@@ -1,6 +1,7 @@
 import { BALANCE } from '../data/balance';
 import { BUILDING_DEFS } from '../data/defs';
 import { NavGrid } from '../world/nav';
+import { landConnectedFrom } from '../world/connectivity';
 import { Tile } from '../world/terrain';
 import { setTile } from '../world/world';
 import { Rng } from './rng';
@@ -42,6 +43,7 @@ export class Sim {
   fogVersion = 0; // muda a cada recálculo, para a renderização saber quando redesenhar
   // Portões abertos: até que tick cada um fica aberto (derivado; fecham sozinhos).
   gateOpenUntil = new Map<number, number>();
+  private land: Uint8Array | null = null;
 
   constructor(readonly state: GameState) {
     this.nav = new NavGrid(state.world);
@@ -50,6 +52,14 @@ export class Sim {
     this.visible = new Uint8Array(state.world.width * state.world.height);
     for (const n of state.world.resourceNodes) this.indexNode(n);
     for (const b of state.buildings) this.occupyBuilding(b);
+  }
+
+  // Terra firme ligada ao centro do mapa (calculada uma vez): titãs só surgem nela, nunca em ilhas.
+  isLandConnected(tx: number, ty: number): boolean {
+    const w = this.state.world;
+    if (tx < 0 || ty < 0 || tx >= w.width || ty >= w.height) return false;
+    if (!this.land) this.land = landConnectedFrom(w, Math.floor(w.width / 2), Math.floor(w.height / 2));
+    return this.land[ty * w.width + tx] === 1;
   }
 
   get tileSize(): number {

@@ -6,7 +6,7 @@ import type { Battalion, BattalionMode, Formation, Unit } from '../entities/type
 import { clearPath, moveTo, stepToward } from './movement';
 import { titanAt } from './commands';
 import { gainXp, isSoldier } from './soldiers';
-import { nearestTitan } from './combat';
+import { nearestReachableTitan, nearestTitan, titanReachable } from './combat';
 import { freeBeds, nearestHospitalWithBeds } from './hospital';
 import { buffFraction, unitBaseHp, unitMaxHp } from './modifiers';
 import { BUILDING_DEFS } from '../data/defs';
@@ -266,14 +266,17 @@ export function updateFollow(sim: Sim, u: Unit): void {
   moveTo(sim, u, goal);
 }
 
-function pickPatrolPoint(sim: Sim): { tx: number; ty: number } | null {
+// Ponto de patrulha que o comandante consegue alcançar a pé (nada de ilhas ou lagos).
+function pickPatrolPoint(sim: Sim, commander: Unit): { tx: number; ty: number } | null {
   const c = sim.state.world.width / 2;
-  for (let i = 0; i < 20; i++) {
+  const ts = sim.tileSize;
+  const region = sim.nav.regionAt(Math.floor(commander.x / ts), Math.floor(commander.y / ts));
+  for (let i = 0; i < 30; i++) {
     const a = sim.rng.range(0, Math.PI * 2);
     const r = sim.rng.range(20, 60);
     const tx = Math.round(c + Math.cos(a) * r);
     const ty = Math.round(c + Math.sin(a) * r);
-    if (sim.nav.isFree(tx, ty)) return { tx, ty };
+    if (sim.nav.isFree(tx, ty) && (!region || sim.nav.regionAt(tx, ty) === region)) return { tx, ty };
   }
   return null;
 }
@@ -361,17 +364,19 @@ export function updateBattalions(sim: Sim): void {
 
     // Decide a ordem do batalhão conforme o modo.
     if (b.order.type === 'attack' && !sim.titan(b.order.titanId)) b.order = { type: 'idle' };
+    // Alvo que ficou inalcançável a pé (ilha, lago, além de uma muralha fechada): desiste e procura outro.
+    if (b.order.type === 'attack' && !titanReachable(sim, c.x, c.y, sim.titan(b.order.titanId)!)) b.order = { type: 'idle' };
     const cpos = { x: c.x, y: c.y };
     if (b.mode === 'manual') {
       if (b.order.type === 'idle') {
-        const t = nearestTitan(sim, cpos.x, cpos.y, (BALANCE.combat.autoAttackRadius + 3) * ts);
+        const t = nearestReachableTitan(sim, cpos.x, cpos.y, (BALANCE.combat.autoAttackRadius + 3) * ts);
         if (t) b.order = { type: 'attack', titanId: t.id };
       }
     } else if (b.mode === 'defend' && b.guard) {
       const gx = (b.guard.tx + 0.5) * ts;
       const gy = (b.guard.ty + 0.5) * ts;
       if (b.order.type !== 'attack') {
-        const t = nearestTitan(sim, gx, gy, S.defendRadius * ts);
+        const t = nearestTitan(sim, gx, gy, S.defendRadius * ts, (x) => titanReachable(sim, cpos.x, cpos.y, x));
         if (t) b.order = { type: 'attack', titanId: t.id };
         else if (Math.hypot(cpos.x - gx, cpos.y - gy) > 3 * ts) b.order = { type: 'move', tx: b.guard.tx, ty: b.guard.ty };
         else b.order = { type: 'idle' };
@@ -382,12 +387,12 @@ export function updateBattalions(sim: Sim): void {
       }
     } else if (b.mode === 'hunt') {
       if (b.order.type !== 'attack') {
-        const t = nearestTitan(sim, cpos.x, cpos.y, S.huntRadius * ts);
+        const t = nearestReachableTitan(sim, cpos.x, cpos.y, S.huntRadius * ts);
         if (t) {
           b.order = { type: 'attack', titanId: t.id };
         } else {
           const reached = b.patrol && Math.hypot(cpos.x - (b.patrol.tx + 0.5) * ts, cpos.y - (b.patrol.ty + 0.5) * ts) < 2 * ts;
-          if (!b.patrol || reached || (b.order.type === 'idle' && c.order.type === 'idle')) b.patrol = pickPatrolPoint(sim);
+          if (!b.patrol || reached || (b.order.type === 'idle' && c.order.type === 'idle')) b.patrol = pickPatrolPoint(sim, c);
           if (b.patrol) b.order = { type: 'move', tx: b.patrol.tx, ty: b.patrol.ty };
         }
       }

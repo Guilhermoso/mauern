@@ -55,7 +55,7 @@ function edgePoint(sim: Sim, angle: number): { tx: number; ty: number } | null {
     const ty = Math.round(cy + Math.sin(angle) * r);
     for (let d = 0; d < 6; d++) {
       for (const [ox, oy] of [[0, 0], [d, 0], [-d, 0], [0, d], [0, -d]]) {
-        if (sim.nav.isTerrainWalkable(tx + ox, ty + oy)) return { tx: tx + ox, ty: ty + oy };
+        if (sim.nav.isTerrainWalkable(tx + ox, ty + oy) && sim.isLandConnected(tx + ox, ty + oy)) return { tx: tx + ox, ty: ty + oy };
       }
     }
   }
@@ -69,14 +69,15 @@ export function spawnTitanNear(sim: Sim, height: number, distance: number): Tita
     const a = sim.rng.range(0, Math.PI * 2);
     const tx = Math.round(c + Math.cos(a) * distance);
     const ty = Math.round(c + Math.sin(a) * distance);
-    if (sim.nav.isTerrainWalkable(tx, ty) && !sim.buildingAt(tx, ty)) return spawnTitan(sim, height, undefined, { tx, ty });
+    if (sim.nav.isTerrainWalkable(tx, ty) && sim.isLandConnected(tx, ty) && !sim.buildingAt(tx, ty)) return spawnTitan(sim, height, undefined, { tx, ty });
   }
   return null;
 }
 
 export function spawnTitan(sim: Sim, height: number, angle?: number, at?: { tx: number; ty: number }): Titan | null {
   const ts = sim.tileSize;
-  let p: { tx: number; ty: number } | null = at ?? null;
+  // Nunca numa ilha isolada (ficaria preso lá, e os soldados também, tentando alcançá-lo).
+  let p: { tx: number; ty: number } | null = at && sim.isLandConnected(at.tx, at.ty) ? at : null;
   for (let attempt = 0; attempt < 12 && !p; attempt++) p = edgePoint(sim, angle ?? sim.rng.range(0, Math.PI * 2));
   if (!p) return null;
   const st = titanStats(height);

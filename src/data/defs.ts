@@ -110,7 +110,7 @@ export const BUILDING_DEFS: Record<BuildingKind, BuildingDef> = {
   hospital: {
     name: 'Hospital de Milícia',
     feminine: false,
-    description: 'Soldados feridos ficam aqui até serem curados por completo. Designe até 3 aldeões como médicos.',
+    description: 'Soldados feridos ficam aqui até serem curados por completo. Designe aldeões como médicos: 3 vagas, e mais 1 a cada ampliação.',
     size: 3, maxHp: 900, housing: 0, cost: { wood: 150, stone: 50 }, buildTime: 40,
     dropsite: [], walkable: false, trains: [], hotkey: 'KeyI', garrison: 0, hospital: true,
   },

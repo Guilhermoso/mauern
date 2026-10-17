@@ -1,6 +1,6 @@
 import { BALANCE } from '../data/balance';
 import { Rng, hashString } from '../core/rng';
-import { TILE_INFO } from './terrain';
+import { landConnectedFrom } from './connectivity';
 import type { World } from './world';
 import type { Poi, PoiKind } from '../entities/types';
 
@@ -13,8 +13,10 @@ export function generatePois(world: World, seed: string, nextNodeId: () => numbe
   const cx = world.width / 2;
   const cy = world.height / 2;
   const nodeAt = new Set(world.resourceNodes.map((n) => n.ty * world.width + n.tx));
+  // Só em terra ligada à vila (nada de ilhas inalcançáveis).
+  const land = landConnectedFrom(world, Math.floor(cx), Math.floor(cy));
   const free = (x: number, y: number) =>
-    x >= 2 && y >= 2 && x < world.width - 2 && y < world.height - 2 && TILE_INFO[world.tiles[y * world.width + x]].walkable && !nodeAt.has(y * world.width + x);
+    x >= 2 && y >= 2 && x < world.width - 2 && y < world.height - 2 && land[y * world.width + x] === 1 && !nodeAt.has(y * world.width + x);
 
   const pois: Poi[] = [];
   const kinds: PoiKind[] = [];

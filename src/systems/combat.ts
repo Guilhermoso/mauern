@@ -53,12 +53,39 @@ export function hitTitan(sim: Sim, t: Titan, damage: number, attacker?: Unit): v
   }
 }
 
-export function nearestTitan(sim: Sim, x: number, y: number, radiusPx: number): Titan | undefined {
+export function nearestTitan(sim: Sim, x: number, y: number, radiusPx: number, accept: (t: Titan) => boolean = () => true): Titan | undefined {
   let best: Titan | undefined;
   let bestD = radiusPx * radiusPx;
   for (const t of sim.state.titans) {
     const d = (t.x - x) ** 2 + (t.y - y) ** 2;
-    if (d < bestD) {
+    if (d < bestD && accept(t)) {
+      bestD = d;
+      best = t;
+    }
+  }
+  return best;
+}
+
+// Dá para chegar a pé, a partir de (x, y), a algum ponto de onde se golpeia este titã?
+// (Titã numa ilha, no meio de um lago ou além de uma muralha fechada: não.)
+export function titanReachable(sim: Sim, x: number, y: number, t: Titan, unitRadius = 7): boolean {
+  const ts = sim.tileSize;
+  const region = sim.nav.regionAt(Math.floor(x / ts), Math.floor(y / ts));
+  if (!region) return true; // parado num tile sem região (raro): não descarta
+  const reach = unitRadius + titanRadius(t.height) + BALANCE.combat.meleeReach;
+  const r = Math.max(1, Math.floor(reach / ts));
+  const tx = Math.floor(t.x / ts);
+  const ty = Math.floor(t.y / ts);
+  return regionHasTile(sim, { x0: tx - r, y0: ty - r, x1: tx + r, y1: ty + r }, region);
+}
+
+// O titã mais próximo que dá para alcançar a pé.
+export function nearestReachableTitan(sim: Sim, x: number, y: number, radiusPx: number): Titan | undefined {
+  let best: Titan | undefined;
+  let bestD = radiusPx * radiusPx;
+  for (const t of sim.state.titans) {
+    const d = (t.x - x) ** 2 + (t.y - y) ** 2;
+    if (d < bestD && titanReachable(sim, x, y, t)) {
       bestD = d;
       best = t;
     }
@@ -141,7 +168,7 @@ function nearestTileInRegion(sim: Sim, cx: number, cy: number, region: number, r
 // Unidades militares paradas atacam titãs que chegam perto.
 export function autoAcquire(sim: Sim, u: Unit): void {
   if (!UNIT_DEFS[u.kind].autoAttack || (sim.state.tick + u.id) % 10 !== 0) return;
-  const t = nearestTitan(sim, u.x, u.y, BALANCE.combat.autoAttackRadius * sim.tileSize);
+  const t = nearestReachableTitan(sim, u.x, u.y, BALANCE.combat.autoAttackRadius * sim.tileSize);
   if (t) {
     u.order = { type: 'attack', titanId: t.id };
     clearPath(u);

@@ -108,7 +108,7 @@ export const BALANCE = {
   hospital: {
     bedsPerLevel: 20, // leitos por nível (nível máximo 5 = 100 leitos)
     maxLevel: 5,
-    maxDoctors: 3,
+    maxDoctors: 3, // no nível 1; cada nível acima libera mais 1 vaga de médico
     healPerSecond: 1.5, // vida curada por segundo, por médico
     upgradeCost: { wood: 100, stone: 60, gold: 20 }, // multiplicado pelo nível de destino
     upgradeSeconds: 60, // multiplicado pelo nível de destino

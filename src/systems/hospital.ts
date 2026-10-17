@@ -11,12 +11,17 @@ import { canAfford, pay } from './commands';
 const H = BALANCE.hospital;
 const DT = 1 / BALANCE.time.ticksPerSecond;
 
-// Hospital de Milícia: soldados feridos ficam internados (escondidos e protegidos) e até 3 aldeões
+// Hospital de Milícia: soldados feridos ficam internados (escondidos e protegidos) e aldeões
 // médicos curam um paciente cada por vez. Curado por completo, o soldado sai sozinho — mas os de um
 // batalhão esperam o batalhão inteiro sarar para saírem juntos.
 
 export function hospitalBeds(b: Building): number {
   return Math.min(H.maxLevel, b.level) * H.bedsPerLevel;
+}
+
+// Vagas de médico: 3 no nível 1, mais 1 por nível de ampliação.
+export function maxDoctors(b: Building): number {
+  return H.maxDoctors + Math.min(H.maxLevel, b.level) - 1;
 }
 
 export function patients(sim: Sim, b: Building): Unit[] {
@@ -48,7 +53,7 @@ export function freeBeds(sim: Sim, h: Building, exceptBattalion = 0): number {
 // Pode esta unidade entrar? Soldados precisam de leito; aldeões, de estar designados como médicos.
 export function canEnterHospital(sim: Sim, h: Building, u: Unit): boolean {
   if (UNIT_DEFS[u.kind].military) return patients(sim, h).length < hospitalBeds(h);
-  return h.doctorIds.includes(u.id) && doctors(sim, h).length < H.maxDoctors;
+  return h.doctorIds.includes(u.id) && doctors(sim, h).length < maxDoctors(h);
 }
 
 export function nearestHospitalWithBeds(sim: Sim, x: number, y: number, beds: number, exceptBattalion = 0): Building | undefined {
@@ -83,7 +88,7 @@ export function commandHospital(sim: Sim, ids: readonly number[], hospitalId: nu
       }
     } else if (u.kind === 'villager') {
       if (!h.doctorIds.includes(u.id)) {
-        if (h.doctorIds.length >= H.maxDoctors) {
+        if (h.doctorIds.length >= maxDoctors(h)) {
           refusedDoctors++;
           continue;
         }
@@ -93,7 +98,7 @@ export function commandHospital(sim: Sim, ids: readonly number[], hospitalId: nu
     u.order = { type: 'garrison', buildingId: h.id };
     clearPath(u);
   }
-  if (refusedDoctors) return `O hospital já tem ${H.maxDoctors} médicos.`;
+  if (refusedDoctors) return `O hospital já tem ${maxDoctors(h)} médicos (amplie para ter mais vagas).`;
   if (refusedBeds) return 'Não há leitos livres para todos.';
   return null;
 }

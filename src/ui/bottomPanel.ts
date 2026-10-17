@@ -22,7 +22,7 @@ import { isSoldier, setTrainer, trainees, trainer, trainingRate, dismissTraining
 import { battalionCapacity, battalionOf, battalionUnits, canChooseFormation, disbandBattalion, setAutoHospital, setCommander, setFormation, setMode, toggleCritical } from '../systems/battalions';
 import { canEnnoble, ennoble, nobleCost } from '../systems/nobility';
 import { POI_HINTS, POI_NAMES, poiDirection } from '../systems/expeditions';
-import { dismissDoctors, doctors, hospitalBeds, patients, startHospitalUpgrade, upgradeCost, upgradeTime } from '../systems/hospital';
+import { dismissDoctors, doctors, hospitalBeds, maxDoctors, patients, startHospitalUpgrade, upgradeCost, upgradeTime } from '../systems/hospital';
 import { activeBuffs } from '../systems/buffs';
 import { buffFraction, honorBonus, honors, isLegend, leadershipBonus, shieldInfo, unitAttack } from '../systems/modifiers';
 import type { Building, Formation, Unit, UnitKind } from '../entities/types';
@@ -480,7 +480,7 @@ export class BottomPanel {
     this.updaters.push(() => {
       beds.textContent = `Nível ${b.level} · Leitos: ${patients(this.sim, b).length}/${hospitalBeds(b)}`;
       const d = doctors(this.sim, b).length;
-      docs.textContent = d ? `Médicos: ${d}/${H.maxDoctors} (cada um cura um soldado por vez)` : 'Sem médicos: mande aldeões para cá (botão direito).';
+      docs.textContent = d ? `Médicos: ${d}/${maxDoctors(b)} (cada um cura um soldado por vez)` : `Sem médicos: mande até ${maxDoctors(b)} aldeões para cá (botão direito).`;
       docs.classList.toggle('warn', d === 0);
       if (b.upgradeProgress >= 0) {
         upg.textContent = `Ampliando para o nível ${b.level + 1}...`;
@@ -494,7 +494,7 @@ export class BottomPanel {
     this.info.append(el('div', 'bp-hint', 'Mande soldados feridos com o botão direito. Curados saem sozinhos; batalhões saem juntos quando todos sararem.'));
     if (b.level < H.maxLevel && b.upgradeProgress < 0) {
       const cost = upgradeCost(b);
-      const up = cmdButton(`Ampliar (nível ${b.level + 1})`, formatCost(cost), '', `+${H.bedsPerLevel} leitos. Leva ${Math.round(upgradeTime(b))} s.`, () => {
+      const up = cmdButton(`Ampliar (nível ${b.level + 1})`, formatCost(cost), '', `+${H.bedsPerLevel} leitos e +1 vaga de médico. Leva ${Math.round(upgradeTime(b))} s.`, () => {
         const err = startHospitalUpgrade(this.sim, b.id);
         if (err) this.toast(err);
       }, 'upgrade');
