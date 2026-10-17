@@ -176,6 +176,15 @@ Cada era deve oferecer:
 - Feridos vão ao Hospital. Mortos são permanentes e registrados no **Memorial** com nome, dia, causa da morte e abates.
 - Formações para grupos selecionados: linha, coluna, círculo defensivo e formação de batedores de longo alcance.
 
+### 9.1 Tropa de Manobra (Omni-directional Mobility Gear) — planejado
+Unidade de elite da Era III, a principal arma contra titãs. Decisões já combinadas:
+- **Movimento por ancoragem**: os ganchos precisam de pontos altos — árvores, edifícios, torres e muralhas. Perto deles a tropa é muito rápida e "salta" de ponto em ponto em vez de andar; em campo aberto fica lenta (ou só anda a pé). Florestas e cidades viram vantagem tática; atravessa rios (água rasa e funda) se houver onde ancorar dos dois lados.
+- **Gás e lâminas**: recursos consumidos no voo (gás) e nos golpes (lâminas). Acabando, a unidade precisa reabastecer num edifício novo (oficina/arsenal), numa carroça de suprimentos ou num posto avançado. Dá peso estratégico a cada saída.
+- **Golpe na nuca**: ataque especial que pode matar o titã de uma vez (chance maior com nível alto e titãs menores); errar expõe a unidade a ser agarrada pelo titã.
+- **Era e custo**: liberada na Era III (Oficina de Manobra + Refinaria de Gás), depois do miliciano; treino caro e demorado.
+- **Visual**: cabos esticados até o ponto de ancoragem durante o voo, rastro de gás e a unidade em arco no ar.
+- **Integração com o que já existe**: usa experiência, patentes, batalhões e formações, honras, nobreza, lendas, hospital e a altura/vida dos titãs.
+
 ## 10. Missões fora das muralhas
 - Não existe tela separada: as expedições acontecem no mesmo mapa, em tempo real. O jogador seleciona tropas, carroças de suprimentos e aldeões, passa pelo portão e os comanda diretamente lá fora (estilo RTS).
 - **Abrir o portão é um risco**: titãs próximos podem entrar enquanto ele está aberto.
@@ -256,6 +265,6 @@ Construir o jogo em incrementos, cada um jogável e testado antes do próximo:
 4. **Era I completa**: casas evoluindo, necessidades, estações, tecnologias da Era I, marcos, crônicas e Grandes Ataques. Balancear para 2–3 horas.
 5. **Mundo externo**: névoa de guerra, pontos de interesse, expedições, sobreviventes, soldados nomeados e memorial.
 6. **Era II**: cadeias de produção, muros de pedra, novas unidades e necessidades, titãs anormais e eventos em cartas.
-7. **Era III**: equipamento de manobra 3D, gás, canhões, postos avançados, Titã Blindado.
+7. **Era III**: equipamento de manobra 3D (ver 9.1), gás, canhões, postos avançados, Titã Blindado.
 8. **Era IV**: Grande Muralha, elite, Titã Colossal, cultura, decorações e estatísticas.
 9. **Polimento contínuo**: sons, efeitos, balanceamento e qualidade de vida.
