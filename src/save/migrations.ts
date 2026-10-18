@@ -138,6 +138,8 @@ const MIGRATIONS: Record<number, Migration> = {
     market: newMarket(),
     buildings: save.buildings.map((b: any) => ({ ...b, produce: 0 })),
   }),
+  // v11 → v12: guardiões de ninho presos ao ninho (campo novo nos titãs).
+  11: (save) => ({ ...save, version: 12, titans: (save.titans ?? []).map((t: any) => ({ ...t, leash: null })) }),
 };
 
 export function migrate(save: any): GameState {

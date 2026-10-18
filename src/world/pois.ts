@@ -25,7 +25,7 @@ export function generatePois(world: World, seed: string, nextNodeId: () => numbe
   for (const kind of kinds) {
     for (let attempt = 0; attempt < 400; attempt++) {
       const a = rng.range(0, Math.PI * 2);
-      const r = rng.range(P.minDistance, Math.min(cx, cy) - 6);
+      const r = rng.range(kind === 'nest' ? P.nestMinDistance : P.minDistance, Math.min(cx, cy) - 6);
       const x = Math.round(cx + Math.cos(a) * r);
       const y = Math.round(cy + Math.sin(a) * r);
       if (!free(x, y) || blocked(x, y)) continue;

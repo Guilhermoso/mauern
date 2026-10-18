@@ -220,6 +220,18 @@ function hourly(sim: Sim): void {
 
   checkHorde(sim);
   checkChronicles(sim);
+  tutorialTips(sim, clock.day, clock.hour);
+}
+
+// Dicas para quem está começando, em horários fixos dos primeiros dias.
+const TIPS: { day: number; hour: number; text: string }[] = [
+  { day: 1, hour: 8, text: `Dica: os primeiros titãs chegam por volta do dia ${BALANCE.titans.firstSpawnDay}. Colete comida e madeira, construa casas (Q) e treine milicianos no Centro da Vila (E).` },
+  { day: 2, hour: 12, text: 'Dica: uma paliçada (Z, arraste para fazer a linha) em volta da vila faz os titãs perderem tempo derrubando-a enquanto seus soldados atacam.' },
+  { day: BALANCE.titans.firstSpawnDay - 1, hour: 18, text: 'Dica: quando um titã aparecer, toque o sino no Centro da Vila (B): os aldeões se abrigam e o Centro atira flechas mais fortes. Mande os milicianos atacar com o botão direito.' },
+];
+
+function tutorialTips(sim: Sim, day: number, hour: number): void {
+  for (const t of TIPS) if (t.day === day && t.hour === hour) sim.alerts.push({ kind: 'tip', text: t.text, x: 0, y: 0 });
 }
 
 // Uma horda é "repelida" quando todos os seus titãs foram abatidos.

@@ -8,6 +8,7 @@ import { randomName } from '../entities/names';
 import { addMoraleMod } from './damage';
 import { setOrder } from './units';
 import { spawnTitan } from './titans';
+import { getClock } from '../core/time';
 
 // Mundo externo: o que acontece nos pontos de interesse quando os moradores chegam lá.
 // Não há tela separada — as expedições acontecem no mesmo mapa, com as unidades comandadas pelo jogador.
@@ -53,7 +54,8 @@ export function onPoiDiscovered(sim: Sim, p: Poi): void {
     // O ninho tem guardiões.
     for (let i = 0; i < P.nestGuards; i++) {
       const at = nearbyFreeTile(sim, p.tx, p.ty, 4);
-      if (at) spawnTitan(sim, 3 + sim.rng.range(0, 2.5), undefined, at);
+      const t = at && spawnTitan(sim, 3 + sim.rng.range(0, 2.5), undefined, at);
+      if (t) t.leash = { tx: p.tx, ty: p.ty, r: P.nestLeash };
     }
   }
 }
@@ -69,6 +71,7 @@ function nearbyFreeTile(sim: Sim, tx: number, ty: number, radius: number): { tx:
 
 // Ninhos ainda ativos podem ser a origem de titãs avulsos (no lugar da borda do mapa).
 export function nestSpawnPoint(sim: Sim): { tx: number; ty: number } | null {
+  if (getClock(sim.state.tick).day < P.nestActiveDay) return null;
   const nests = sim.state.pois.filter((p) => p.kind === 'nest' && !p.done);
   if (!nests.length || !sim.rng.chance(P.nestSpawnShare)) return null;
   const n = nests[sim.rng.int(0, nests.length - 1)];

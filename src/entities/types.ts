@@ -180,7 +180,8 @@ export interface Titan {
   lastHitTick: number; // para o efeito visual de dano
   sighted: boolean; // já foi anunciado ao jogador
   skin: number; // variação de cor
-  horde: boolean; // faz parte de um Grande Ataque
+  horde: boolean;
+  leash: { tx: number; ty: number; r: number } | null; // guardião de ninho: não se afasta dele // faz parte de um Grande Ataque
 }
 
 export interface ThreatState {

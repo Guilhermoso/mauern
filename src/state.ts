@@ -23,7 +23,7 @@ import { BUILDING_DEFS, UNIT_DEFS } from './data/defs';
 import { randomName } from './entities/names';
 import { generatePois } from './world/pois';
 
-export const SAVE_VERSION = 11;
+export const SAVE_VERSION = 12;
 
 export interface LogEntry {
   tick: number;
@@ -92,6 +92,10 @@ export function createNewGame(seed: string): GameState {
   for (let i = 0; i < BALANCE.start.villagers; i++) {
     const a = (i / BALANCE.start.villagers) * Math.PI + Math.PI * 0.25;
     units.push(newUnit(nextId++, 'villager', randomName(rng), centerX + Math.cos(a) * ts * 3.2, centerY + Math.sin(a) * ts * 3.2));
+  }
+  for (let i = 0; i < BALANCE.start.militia; i++) {
+    const m = newUnit(nextId++, 'militia', randomName(rng), centerX + ts * (3.5 + i), centerY + ts * 3.5);
+    units.push(m);
   }
   for (let i = 0; i < BALANCE.start.scouts; i++) {
     units.push(newUnit(nextId++, 'scout', randomName(rng), centerX - ts * 3.5, centerY - ts * 2.5));

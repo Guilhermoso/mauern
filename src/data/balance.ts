@@ -19,6 +19,7 @@ export const BALANCE = {
     resources: { food: 200, wood: 150, stone: 50, iron: 0, gold: 0, wool: 0, bread: 0, clothes: 0 },
     villagers: 4,
     scouts: 1,
+    militia: 2, // uma pequena guarda para os primeiros titãs
   },
   resources: {
     treeWood: 100,
@@ -68,6 +69,9 @@ export const BALANCE = {
   // Pontos de interesse fora dos muros.
   pois: {
     minDistance: 34, // tiles do centro: só lá fora
+    nestMinDistance: 60, // ninhos ficam bem mais longe da vila
+    nestActiveDay: 12, // antes disso os ninhos não soltam titãs avulsos
+    nestLeash: 9, // tiles: os guardiões não se afastam mais que isso do ninho
     spacing: 18, // distância mínima entre dois pontos
     count: { ruins: 6, survivors: 4, nest: 3, deposit: 3, lore: 4 } as Record<string, number>,
     interactRadius: 2, // tiles: perto disso a unidade age no ponto
@@ -140,7 +144,7 @@ export const BALANCE = {
     runAwayTiles: 10, // sem abrigo com vaga, o aldeão corre essa distância para longe do titã
   },
   titans: {
-    firstSpawnDay: 3, // os primeiros dias são calmos
+    firstSpawnDay: 5, // os primeiros dias são calmos (tempo para se preparar)
     // Intervalo entre aparições (em horas de jogo): começa longo e diminui com os dias,
     // até um piso definido pela era (faixa de ameaça).
     startIntervalHours: 22,

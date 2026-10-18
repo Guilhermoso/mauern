@@ -178,12 +178,13 @@ describe('portões', () => {
     }
     const gate = s.buildings.find((b) => b.kind === 'gate')!;
     const hp0 = gate.hp;
-    // Alguém parado no portão: fica aberto o tempo todo.
-    const v = addVillager(s, CENTER + 12, CENTER);
-    v.hp = 1e9;
     const t = addTitan(s, CENTER + 22, CENTER, 4);
     const sim = new Sim(s);
-    runSeconds(sim, 25);
+    // Portão mantido aberto (como se alguém passasse o tempo todo); o titã marcha para o Centro da Vila.
+    for (let i = 0; i < 25 * BALANCE.time.ticksPerSecond; i++) {
+      sim.gateOpenUntil.set(gate.id, s.tick + 10);
+      step(sim);
+    }
     expect(t.x / TS).toBeLessThan(CENTER + 12);
     expect(gate.hp).toBe(hp0);
     expect(s.buildings.includes(gate)).toBe(true);

@@ -43,7 +43,7 @@ export function addTitan(s: GameState, tx: number, ty: number, height = 4): Tita
   const t: Titan = {
     id: s.nextId++, kind: 'common', height, x: (tx + 0.5) * ts, y: (ty + 0.5) * ts, hp: st.maxHp, maxHp: st.maxHp,
     facing: 0, targetKind: 'none', targetId: 0, path: [], pathKey: '', repathTick: 0, retargetTick: 0,
-    attackCooldown: 0, lastHitTick: -1000, sighted: true, skin: 0.5, horde: false,
+    attackCooldown: 0, lastHitTick: -1000, sighted: true, skin: 0.5, horde: false, leash: null,
   };
   s.titans.push(t);
   return t;

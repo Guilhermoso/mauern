@@ -219,6 +219,7 @@ async function boot(): Promise<void> {
     underAttack: 15000,
     greatAttack: 0,
     discovery: 0,
+    tip: 0,
     death: 2500,
     destroyed: 4000,
     victory: 0,
@@ -258,6 +259,9 @@ async function boot(): Promise<void> {
         break;
       case 'promotion':
         hud.toast(a.text, goTo, false, true);
+        break;
+      case 'tip':
+        hud.toast(a.text, undefined, false, true, 14000);
         break;
       case 'discovery':
         hud.toast(a.text, goTo, false, true);

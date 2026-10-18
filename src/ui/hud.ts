@@ -227,7 +227,7 @@ export class Hud {
   }
 
   // Notificação passageira. Com onClick, clicar nela leva a câmera ao local do evento.
-  toast(text: string, onClick?: () => void, danger = false, good = false): void {
+  toast(text: string, onClick?: () => void, danger = false, good = false, durationMs = 5000): void {
     const t = document.createElement('div');
     t.className = 'toast panel';
     if (danger) t.classList.add('danger');
@@ -243,6 +243,7 @@ export class Hud {
     }
     this.toasts.appendChild(t);
     while (this.toasts.children.length > 4) this.toasts.firstChild!.remove();
-    setTimeout(() => t.remove(), 5000);
+    if (durationMs > 5000) t.style.animationDuration = `${durationMs / 1000}s`;
+    setTimeout(() => t.remove(), durationMs);
   }
 }

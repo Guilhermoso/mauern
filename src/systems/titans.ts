@@ -108,6 +108,7 @@ export function spawnTitan(sim: Sim, height: number, angle?: number, at?: { tx: 
     sighted: false,
     skin: sim.rng.next(),
     horde: false,
+    leash: null,
   };
   sim.state.titans.push(t);
   return t;
@@ -322,6 +323,19 @@ export function updateTitans(sim: Sim): void {
       goal = { x0: b.tx, y0: b.ty, x1: b.tx + s - 1, y1: b.ty + s - 1, adjacent: true };
       targetX = (b.tx + s / 2) * ts;
       targetY = (b.ty + s / 2) * ts;
+    }
+    // Guardião de ninho: não persegue nada para longe do ninho; sem alvo por perto, volta e espera lá.
+    if (t.leash) {
+      const hx = (t.leash.tx + 0.5) * ts;
+      const hy = (t.leash.ty + 0.5) * ts;
+      const tooFar = Math.hypot(targetX - hx, targetY - hy) > t.leash.r * ts;
+      if (!goal || t.targetKind === 'march' || tooFar) {
+        if (Math.hypot(t.x - hx, t.y - hy) < 2 * ts) continue;
+        goal = { x0: t.leash.tx - 1, y0: t.leash.ty - 1, x1: t.leash.tx + 1, y1: t.leash.ty + 1, adjacent: false };
+        targetX = hx;
+        targetY = hy;
+        if (t.targetKind !== 'unit') t.targetKind = 'none';
+      }
     }
     if (!goal) continue;
 
