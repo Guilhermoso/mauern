@@ -14,7 +14,9 @@ import { ringAlarm, stopAlarm } from '../systems/combat';
 import { availableTechs, cancelResearch, startResearch } from '../systems/research';
 import { TECH_DEFS, type TechId } from '../data/techs';
 import { BALANCE } from '../data/balance';
-import { missingNeeds, serviceRadius } from '../systems/city';
+import { maxHouseLevel, missingNeeds, serviceRadius } from '../systems/city';
+import { isWorkshop, workerOf, workshopProblem, workshopRecipe } from '../systems/workshops';
+import { lotPrice, trade, TRADEABLE } from '../systems/market';
 import { buildingMaxHp, unitMaxHp } from '../systems/modifiers';
 import { housingOf } from '../state';
 import { rankName, xpToNext, MAX_LEVEL } from '../data/ranks';
@@ -225,9 +227,11 @@ export class BottomPanel {
     if (b.kind === 'house') this.buildHouseInfo(b);
     if (b.kind === 'trainingGround') this.buildTrainingGround(b);
     if (b.kind === 'hospital') this.buildHospital(b);
-    if (b.kind === 'well' || b.kind === 'bonfire') {
+    if (b.kind === 'well' || b.kind === 'bonfire' || b.kind === 'chapel' || b.kind === 'plaza') {
       this.info.append(el('div', 'bp-line', `Alcance: ${serviceRadius(this.sim, b.kind)} tiles (círculo no mapa)`));
     }
+    if (b.built && isWorkshop(b)) this.buildWorkshop(b);
+    if (b.built && b.kind === 'market') this.buildMarket();
     this.buildResearch(b);
     if (def.garrison > 0) this.buildShelter(b);
     if (b.kind === 'townCenter') {
@@ -630,16 +634,70 @@ export class BottomPanel {
         need.textContent = `Faltando: ${losing.join(', ')}. A casa vai regredir se continuar assim.`;
         return;
       }
-      if (b.level >= 3) {
-        need.textContent = 'Nível máximo desta era.';
+      if (b.level >= maxHouseLevel(this.sim)) {
+        need.textContent = b.level >= 4 ? 'Sobrado: o maior nível de casa.' : 'Nível máximo desta era (sobrados chegam na Era II).';
         return;
       }
       const next = missingNeeds(this.sim, b, b.level + 1);
-      if (b.level + 1 === 3 && this.sim.state.resources.stone < C.level3StoneCost) next.push(`${C.level3StoneCost} de pedra`);
+      const r = this.sim.state.resources;
+      if (b.level + 1 === 3 && r.stone < C.level3StoneCost) next.push(`${C.level3StoneCost} de pedra`);
+      if (b.level + 1 === 4 && (r.stone < (C.level4Cost.stone ?? 0) || r.wood < (C.level4Cost.wood ?? 0))) next.push(formatCost(C.level4Cost));
       need.textContent = next.length
         ? `Para virar ${C.houseLevelNames[b.level].toLowerCase()}: ${next.join(', ')}.`
         : `Evoluindo para ${C.houseLevelNames[b.level].toLowerCase()}...`;
     });
+  }
+
+  // Oficina: trabalhador, receita e o que a impede de produzir.
+  private buildWorkshop(b: Building): void {
+    const r = workshopRecipe(b);
+    const recipe = `${Object.keys(r.input).length ? `${formatCost(r.input)} → ` : ''}${formatCost(r.output)} a cada ${r.seconds} s`;
+    this.info.append(el('div', 'bp-line', `Produção: ${recipe}${b.kind === 'pasture' ? ' (metade no inverno)' : ''}`));
+    const who = el('div', 'bp-line');
+    const status = el('div', 'bp-line');
+    const bar = progressBar();
+    this.info.append(who, status, bar.el);
+    this.updaters.push(() => {
+      const w = workerOf(this.sim, b);
+      who.textContent = w ? `Trabalhador: ${w.name}` : 'Sem trabalhador';
+      const problem = workshopProblem(this.sim, b);
+      status.textContent = problem || 'Produzindo.';
+      status.classList.toggle('warn', !!problem);
+      bar.set(b.produce / r.seconds);
+    });
+  }
+
+  // Mercado: vender e comprar lotes de cada recurso por ouro.
+  private buildMarket(): void {
+    const MK = BALANCE.market;
+    this.info.append(el('div', 'bp-hint', `Troca lotes de ${MK.lot}. Cada troca piora o preço daquele recurso; ele volta ao normal com o tempo.`));
+    const list = el('div', 'bp-members wide market');
+    list.appendChild(el('div', 'bp-sub', `Lotes de ${MK.lot} — preços em ouro:`));
+    for (const kind of TRADEABLE) {
+      const row = el('div', 'market-row');
+      const name = el('span', 'market-name');
+      name.append(cmdIconImg(`res-${kind}`, 'mini-icon'), document.createTextNode(` ${RESOURCE_NAMES[kind]}`));
+      const sell = document.createElement('button');
+      const buy = document.createElement('button');
+      sell.onclick = () => {
+        const err = trade(this.sim, kind, 'sell');
+        if (err) this.toast(err);
+      };
+      buy.onclick = () => {
+        const err = trade(this.sim, kind, 'buy');
+        if (err) this.toast(err);
+      };
+      row.append(name, sell, buy);
+      list.appendChild(row);
+      this.updaters.push(() => {
+        const r = this.sim.state.resources;
+        sell.textContent = `Vender +${lotPrice(this.sim, kind, 'sell')}`;
+        buy.textContent = `Comprar −${lotPrice(this.sim, kind, 'buy')}`;
+        sell.disabled = r[kind] < MK.lot;
+        buy.disabled = r.gold < lotPrice(this.sim, kind, 'buy');
+      });
+    }
+    this.commands.appendChild(list);
   }
 
   private buildResearch(b: Building): void {

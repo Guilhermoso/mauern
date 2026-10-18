@@ -59,6 +59,13 @@ obra mantém a vida da paliçada até ficar mais forte) e a **torre de pedra**. 
 **escombros** passáveis: mande aldeões reconstruir (sem custo) — só somem se você demolir. Na Era II também surgem os
 **titãs anormais**: mais rápidos, mais resistentes e imprevisíveis.
 
+**Produção e necessidades (Era II):** o **Pasto de Ovelhas** produz lã, a **Padaria** transforma comida em pão e a
+**Tecelagem** transforma lã em roupas — cada oficina tem um trabalhador (clique direito com um aldeão; quem constrói já
+fica trabalhando). Casas de pedra com capela por perto, pão, roupas e moral alta viram **sobrados** (mais moradores e
+impostos), que consomem pão e roupas todo dia — faltando, a moral cai e eles regridem. A **Praça** melhora a moral das
+casas em volta, e o **Mercado** compra e vende lotes de recursos por ouro (o preço piora a cada troca e volta ao normal
+com o tempo).
+
 **Mundo externo:** o mapa começa coberto pela **névoa de guerra** — só se vê o que unidades e edifícios
 enxergam (batedores veem longe). Lá fora há **pontos de interesse**: ruínas para vasculhar (recursos), sobreviventes
 para resgatar (viram aldeões), ninhos de titãs para destruir (de onde vêm titãs), jazidas de ferro valiosas e locais

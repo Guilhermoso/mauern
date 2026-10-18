@@ -20,6 +20,9 @@ const CARRY_COLORS: Record<ResourceKind, number> = {
   stone: 0xb0aca2,
   iron: 0x6d7f8c,
   gold: 0xe0b43c,
+  wool: 0xeeeae0,
+  bread: 0xc8904a,
+  clothes: 0x6a5aa8,
 };
 
 interface BuildingView {

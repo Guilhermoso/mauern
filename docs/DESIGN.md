@@ -266,7 +266,7 @@ Construir o jogo em incrementos, cada um jogável e testado antes do próximo:
 5. **Mundo externo**: névoa de guerra, pontos de interesse, expedições, sobreviventes, soldados nomeados e memorial. ✔ (feito; os sinalizadores verde/vermelho/preto ficam para quando houver titãs anormais, na Era II)
 6. **Era II**: cadeias de produção, muros de pedra, novas unidades e necessidades, titãs anormais e eventos em cartas.
    - Fase 1 ✔: avanço de era, Quartel (lanceiro), Campo de Arqueiros (arqueiro), muro/portão/torre de pedra com escombros consertáveis, titãs anormais.
-   - Fase 2: cadeias de produção e necessidades (padaria/pão, curtume e tecelagem/roupas, capela/fé, mercado, praça, novo nível de casa).
+   - Fase 2 ✔: pasto (lã), padaria (comida → pão), tecelagem (lã → roupas), capela (fé), praça (moral), mercado com preço dinâmico e sobrados (casa nível 4) que consomem pão e roupas.
    - Fase 3: ferraria e fundição, estábulo (cavaleiro batedor), carroça de suprimentos, estradas, sinalizadores e marcos para a Era III.
 7. **Era III**: equipamento de manobra 3D (ver 9.1), gás, canhões, postos avançados, Titã Blindado.
 8. **Era IV**: Grande Muralha, elite, Titã Colossal, cultura, decorações e estatísticas.

@@ -1,7 +1,7 @@
 // Estruturas de dados das entidades. São objetos simples e serializáveis,
 // referenciados por ID (sem referências circulares) para facilitar o save.
 
-export type ResourceKind = 'food' | 'wood' | 'stone' | 'iron' | 'gold';
+export type ResourceKind = 'food' | 'wood' | 'stone' | 'iron' | 'gold' | 'wool' | 'bread' | 'clothes';
 export type Resources = Record<ResourceKind, number>;
 
 export type ResourceNodeKind = 'tree' | 'berries' | 'stone' | 'iron' | 'crystal';
@@ -35,7 +35,13 @@ export type BuildingKind =
   | 'archeryRange'
   | 'stoneWall'
   | 'stoneGate'
-  | 'stoneTower';
+  | 'stoneTower'
+  | 'pasture'
+  | 'bakery'
+  | 'weaver'
+  | 'chapel'
+  | 'market'
+  | 'plaza';
 
 export interface TrainItem {
   kind: UnitKind;
@@ -70,6 +76,7 @@ export interface Building {
   doctorIds: number[]; // hospital: aldeões designados como médicos
   upgradeProgress: number; // segundos de ampliação já feitos (-1 = não está ampliando)
   ruined: boolean; // muros de pedra destruídos viram escombros (passáveis) até serem reconstruídos
+  produce: number; // oficinas (pasto, padaria, tecelagem): segundos de trabalho acumulados
 }
 
 export type UnitKind = 'villager' | 'scout' | 'militia' | 'spearman' | 'archer';
@@ -93,7 +100,8 @@ export type UnitOrder =
   | { type: 'garrison'; buildingId: number }
   | { type: 'train'; buildingId: number }
   | { type: 'follow' } // membro de batalhão seguindo o comandante em formação
-  | { type: 'flee'; buildingId: number; tx: number; ty: number }; // fugindo de um titã (para um abrigo ou para longe)
+  | { type: 'flee'; buildingId: number; tx: number; ty: number } // fugindo de um titã (para um abrigo ou para longe)
+  | { type: 'work'; buildingId: number }; // trabalhando numa oficina (pastor, padeiro, tecelão)
 
 export interface Unit {
   id: number;
@@ -230,6 +238,8 @@ export interface CityState {
   cold: boolean; // faltou lenha na última hora de inverno
   hungerThisWinter: boolean;
   taxCarry: number; // frações de ouro acumuladas
+  lackBread: boolean; // faltou pão para os sobrados na última hora
+  lackClothes: boolean; // faltaram roupas para os sobrados na última hora
 }
 
 export interface EventState {

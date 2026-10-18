@@ -7,6 +7,7 @@ import { TILE_INFO } from '../world/terrain';
 import { getTile } from '../world/world';
 import { farmTaken, findNearestNode, gathererCounts, isExposed } from './queries';
 import { isVisible } from './fog';
+import { commandWork, isWorkshop } from './workshops';
 import { ERA_NAMES } from './era';
 import { buildingMaxHp } from './modifiers';
 import { commandTrain } from './soldiers';
@@ -198,6 +199,7 @@ export function smartCommand(sim: Sim, ids: readonly number[], wx: number, wy: n
     if (!builders.length) return null;
     // Hospital pronto e inteiro: aldeões viram médicos.
     if (b.built && def.hospital && b.hp >= buildingMaxHp(sim.state, b)) return commandHospital(sim, bIds, b.id);
+    if (b.built && isWorkshop(b) && b.hp >= buildingMaxHp(sim.state, b)) return commandWork(sim, bIds, b.id);
     if (!b.built || b.hp < buildingMaxHp(sim.state, b)) commandBuild(sim, bIds, b.id);
     else if (b.kind === 'farm') commandFarm(sim, bIds, b.id);
     else {

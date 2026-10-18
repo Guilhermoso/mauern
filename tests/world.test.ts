@@ -55,7 +55,7 @@ describe('createNewGame', () => {
     expect(s.buildings.map((b) => b.kind)).toEqual(['townCenter']);
     expect(s.units.filter((u) => u.kind === 'villager')).toHaveLength(4);
     expect(s.units.filter((u) => u.kind === 'scout')).toHaveLength(1);
-    expect(s.resources).toEqual({ food: 200, wood: 150, stone: 50, iron: 0, gold: 0 });
+    expect(s.resources).toEqual({ food: 200, wood: 150, stone: 50, iron: 0, gold: 0, wool: 0, bread: 0, clothes: 0 });
   });
 
   it('não repete IDs entre recursos e entidades', () => {

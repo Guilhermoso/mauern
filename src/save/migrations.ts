@@ -1,4 +1,4 @@
-import { SAVE_VERSION, initialExplored, type GameState } from '../state';
+import { SAVE_VERSION, initialExplored, newMarket, type GameState } from '../state';
 import { BALANCE } from '../data/balance';
 import { generatePois } from '../world/pois';
 
@@ -128,6 +128,16 @@ const MIGRATIONS: Record<number, Migration> = {
   },
   // v9 → v10: Era II — muros de pedra viram escombros (campo novo nos edifícios).
   9: (save) => ({ ...save, version: 10, buildings: save.buildings.map((b: any) => ({ ...b, ruined: false })) }),
+  // v10 → v11: Era II, fase 2 — lã, pão e roupas, oficinas, mercado e necessidades dos sobrados.
+  10: (save) => ({
+    ...save,
+    version: 11,
+    resources: { wool: 0, bread: 0, clothes: 0, ...save.resources },
+    stats: save.stats && { ...save.stats, gathered: { wool: 0, bread: 0, clothes: 0, ...save.stats.gathered } },
+    city: { lackBread: false, lackClothes: false, ...save.city },
+    market: newMarket(),
+    buildings: save.buildings.map((b: any) => ({ ...b, produce: 0 })),
+  }),
 };
 
 export function migrate(save: any): GameState {

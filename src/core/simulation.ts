@@ -15,6 +15,7 @@ import { payNobles, updateValor } from '../systems/nobility';
 import { updateFog } from '../systems/fog';
 import { updateExpeditions } from '../systems/expeditions';
 import { updateGates } from '../systems/gates';
+import { updateWorkshops } from '../systems/workshops';
 
 // Um passo fixo da simulação. Não depende da renderização.
 export function step(sim: Sim): void {
@@ -28,6 +29,7 @@ export function step(sim: Sim): void {
   updateValor(sim);
   updateExpeditions(sim);
   updateGates(sim);
+  updateWorkshops(sim);
   updateProduction(sim);
   updateBattalions(sim);
   updateFear(sim);

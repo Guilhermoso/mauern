@@ -48,7 +48,7 @@ describe('avanço para a Era II', () => {
     s.techs = TECH_IDS.filter((id) => TECH_DEFS[id].era === 0).slice(0, r.techs);
     s.stats.greatAttacksRepelled = r.greatAttacksRepelled;
     s.stats.titansKilled = r.titansKilled;
-    s.resources = { food: 5000, wood: 5000, stone: 5000, iron: 0, gold: 0 };
+    s.resources = { food: 5000, wood: 5000, stone: 5000, iron: 0, gold: 0, wool: 0, bread: 0, clothes: 0 };
     const sim = new Sim(s);
     expect(eraMilestones(sim).filter((m) => !m.done).map((m) => m.label)).toEqual([]);
     expect(advanceEra(sim)).toBeNull();
@@ -59,7 +59,7 @@ describe('avanço para a Era II', () => {
 
   it('edifícios e unidades da Era II ficam bloqueados na Era I', () => {
     const s = flatGame();
-    s.resources = { food: 9999, wood: 9999, stone: 9999, iron: 9999, gold: 9999 };
+    s.resources = { food: 9999, wood: 9999, stone: 9999, iron: 9999, gold: 9999, wool: 0, bread: 0, clothes: 0 };
     const v = addVillager(s, CENTER + 6, CENTER + 6);
     const sim = new Sim(s);
     expect(placeBuilding(sim, 'barracks', CENTER + 8, CENTER + 8, [v.id]).error).toMatch(/Era II/);

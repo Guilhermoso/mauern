@@ -66,7 +66,7 @@ export class EraPanel {
       intro.textContent = `Você está na ${ERA_NAMES[s.era]}. ${ERA_UNLOCKS[s.era]}`;
       const note = document.createElement('p');
       note.className = 'muted small';
-      note.textContent = `Os marcos para a ${ERA_NAMES[s.era + 1]} chegam numa próxima atualização, junto com o resto da Era II (cadeias de produção, novas necessidades, estábulo e mais). Seu progresso fica guardado.`;
+      note.textContent = `Os marcos para a ${ERA_NAMES[s.era + 1]} chegam numa próxima atualização, junto com o resto da Era II (ferraria, estábulo, carroça de suprimentos, estradas e mais). Seu progresso fica guardado.`;
       this.body.appendChild(note);
       return;
     }

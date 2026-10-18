@@ -181,7 +181,7 @@ describe('moral', () => {
 describe('tecnologias', () => {
   it('pesquisa custa recursos, leva tempo e dá o bônus', () => {
     const s = flatGame();
-    s.resources = { food: 1000, wood: 1000, stone: 1000, iron: 0, gold: 500 };
+    s.resources = { food: 1000, wood: 1000, stone: 1000, iron: 0, gold: 500, wool: 0, bread: 0, clothes: 0 };
     const sim = new Sim(s);
     const camp = addBuilt(sim, 'lumberCamp', CENTER + 8, CENTER);
     const rate0 = gatherRate(sim, 'tree');
@@ -194,7 +194,7 @@ describe('tecnologias', () => {
 
   it('exige o edifício certo e os pré-requisitos', () => {
     const s = flatGame();
-    s.resources = { food: 1000, wood: 1000, stone: 1000, iron: 0, gold: 500 };
+    s.resources = { food: 1000, wood: 1000, stone: 1000, iron: 0, gold: 500, wool: 0, bread: 0, clothes: 0 };
     const sim = new Sim(s);
     const mill = addBuilt(sim, 'mill', CENTER + 8, CENTER);
     expect(startResearch(sim, s.buildings[0].id, 'sharpAxes')).toMatch(/indisponível/);
@@ -204,7 +204,7 @@ describe('tecnologias', () => {
 
   it('cancelar devolve os recursos', () => {
     const s = flatGame();
-    s.resources = { food: 1000, wood: 1000, stone: 1000, iron: 0, gold: 500 };
+    s.resources = { food: 1000, wood: 1000, stone: 1000, iron: 0, gold: 500, wool: 0, bread: 0, clothes: 0 };
     const sim = new Sim(s);
     expect(startResearch(sim, s.buildings[0].id, 'wickerBaskets')).toBeNull();
     cancelResearch(sim, s.buildings[0].id);
@@ -213,7 +213,7 @@ describe('tecnologias', () => {
 
   it('Treino de Milícia fortalece também os milicianos que já existem', () => {
     const s = flatGame();
-    s.resources = { food: 1000, wood: 1000, stone: 1000, iron: 0, gold: 500 };
+    s.resources = { food: 1000, wood: 1000, stone: 1000, iron: 0, gold: 500, wool: 0, bread: 0, clothes: 0 };
     const m = newUnit(s.nextId++, 'militia', 'Otto Bauer', CENTER * 32, (CENTER + 6) * 32);
     s.units.push(m);
     const sim = new Sim(s);

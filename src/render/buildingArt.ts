@@ -259,6 +259,25 @@ function drawFinished(kind: BuildingKind, size: number, level = 1): BuildingArt 
         break;
       }
       const stone = level >= 3;
+      if (level >= 4) {
+        // Sobrado: dois andares, telhado de ardósia com águas-furtadas e duas chaminés.
+        casters.push(rectCaster(0, 0, size, size, 12));
+        g.rect(0, 0, size, size).fill(0xa8a296);
+        const slate = 0x3e4654;
+        g.rect(0, 0, size, size / 2).fill(shade(slate, 1.15));
+        g.rect(0, size / 2, size, size / 2).fill(shade(slate, 0.8));
+        g.rect(0, size / 2 - 1, size, 2).fill(shade(slate, 0.5));
+        for (const x of [8, size - 18]) {
+          g.rect(x, size / 2 + 4, 10, 8).fill(0xd8d2c4); // água-furtada
+          g.rect(x + 3, size / 2 + 6, 4, 4).fill(0x5a7aa0);
+        }
+        for (const x of [4, size - 12]) {
+          g.rect(x, 4, 8, 8).fill(0x6a645a);
+          g.rect(x + 1, 5, 6, 6).fill(0x2e2a26);
+        }
+        for (const [x, y] of [[0, 0], [size - 5, 0], [0, size - 5], [size - 5, size - 5]]) g.rect(x, y, 5, 5).fill(0xc8c2b6);
+        break;
+      }
       casters.push(rectCaster(0, 2, size, size - 4, stone ? 9 : 8));
       const roof = stone ? 0x4f5866 : 0x9c4a2e;
       g.rect(2, 4, size - 4, size - 8).fill(stone ? 0x9a948a : 0x7a5634); // paredes
@@ -478,6 +497,81 @@ function drawFinished(kind: BuildingKind, size: number, level = 1): BuildingArt 
       }
       g.rect(size / 2 - 1, size / 2 - 22, 2, 22).fill(0x3a2e22);
       g.poly([size / 2 + 1, size / 2 - 22, size / 2 + 15, size / 2 - 18, size / 2 + 1, size / 2 - 14]).fill(PLAYER_COLOR);
+      break;
+    }
+    case 'pasture': {
+      // Pasto cercado com ovelhas.
+      g.rect(1, 1, size - 2, size - 2).fill(0x7aa83e);
+      for (let i = 0; i < 30; i++) g.circle(5 + ((i * 41) % (size - 10)), 5 + ((i * 67) % (size - 10)), 1.3).fill(0x5f8f2e);
+      g.rect(1, 1, size - 2, size - 2).stroke({ width: 2.5, color: 0x8b5e34 });
+      for (let x = 2; x < size; x += 12) for (const y of [1, size - 3]) g.rect(x, y - 1, 3, 4).fill(0x5a3d22);
+      for (const [x, y] of [[22, 24], [52, 34], [34, 60], [66, 62], [70, 20]]) {
+        g.ellipse(x + 2, y + 3, 9, 5).fill({ color: 0x000000, alpha: 0.18 });
+        g.ellipse(x, y, 9, 6.5).fill(0xf2efe6).stroke({ width: 1, color: 0xb0aa9e });
+        g.circle(x + 8, y - 1, 3.4).fill(0x3a3530);
+      }
+      break;
+    }
+    case 'bakery': {
+      casters.push(rectCaster(0, 2, size, size - 4, 8));
+      g.rect(2, 4, size - 4, size - 8).fill(0xd8c49a);
+      const roof = 0xa8532e;
+      g.rect(0, 2, size, size / 2 - 2).fill(shade(roof, 1.12));
+      g.rect(0, size / 2, size, size / 2 - 2).fill(shade(roof, 0.8));
+      g.rect(0, size / 2 - 1, size, 2).fill(shade(roof, 0.5));
+      g.circle(size - 14, 12, 6).fill(0x8f8a80).stroke({ width: 1, color: 0x5e5a52 }); // chaminé do forno
+      g.circle(size - 14, 12, 3).fill(0x2a2018);
+      g.ellipse(14, size - 14, 9, 5).fill(0xc8904a).stroke({ width: 1, color: 0x6a4020 }); // pão na porta
+      break;
+    }
+    case 'weaver': {
+      casters.push(rectCaster(0, 2, size, size - 4, 8));
+      g.rect(2, 4, size - 4, size - 8).fill(0xd8c49a);
+      const roof = 0x4e5a78;
+      g.rect(0, 2, size, size / 2 - 2).fill(shade(roof, 1.12));
+      g.rect(0, size / 2, size, size / 2 - 2).fill(shade(roof, 0.8));
+      g.rect(0, size / 2 - 1, size, 2).fill(shade(roof, 0.5));
+      for (let i = 0; i < 4; i++) g.rect(10 + i * 11, size - 16, 4, 10).fill([0x6a5aa8, 0xc8283c, 0xe8c24a, 0x4f8cff][i]); // tecidos
+      break;
+    }
+    case 'chapel': {
+      casters.push(rectCaster(6, 0, size - 12, size, 14));
+      g.rect(8, 6, size - 16, size - 8).fill(0xe8dcc6);
+      const roof = 0x5a4a6a;
+      g.rect(6, 4, (size - 12) / 2, size - 6).fill(shade(roof, 1.12));
+      g.rect(size / 2, 4, (size - 12) / 2, size - 6).fill(shade(roof, 0.8));
+      g.rect(size / 2 - 1, 4, 2, size - 6).fill(shade(roof, 0.5));
+      // Torre do sino com a cruz
+      g.rect(size / 2 - 7, 0, 14, 14).fill(0xd8d2c4).stroke({ width: 1, color: 0x8a8070 });
+      g.rect(size / 2 - 1, -6, 2, 10).fill(0x8a7a5a);
+      g.rect(size / 2 - 4, -3, 8, 2).fill(0x8a7a5a);
+      break;
+    }
+    case 'market': {
+      // Barracas listradas em volta de um pátio.
+      casters.push(rectCaster(4, 4, size - 8, 20, 6));
+      g.rect(1, 1, size - 2, size - 2).fill(0xb8a888);
+      const colors = [0xc8283c, 0xe8dcc6, 0x4f8cff, 0xe8c24a];
+      for (let i = 0; i < 4; i++) {
+        const x = 6 + i * ((size - 12) / 4);
+        const w = (size - 12) / 4 - 3;
+        for (let k = 0; k < 4; k++) g.rect(x + (k * w) / 4, 4, w / 4, 20).fill(k % 2 ? 0xf2efe6 : colors[i]);
+        g.rect(x, 24, w, 3).fill(0x5a3d22);
+      }
+      for (const [x, y] of [[20, 50], [44, 62], [70, 48], [60, 76], [28, 78]]) {
+        g.rect(x - 5, y - 4, 10, 8).fill(0x8b5e34).stroke({ width: 1, color: 0x4a301a }); // caixotes
+      }
+      g.circle(size / 2, size / 2 + 12, 4).fill(0xe0b43c);
+      break;
+    }
+    case 'plaza': {
+      // Calçamento com chafariz no centro e árvores nos cantos.
+      g.rect(1, 1, size - 2, size - 2).fill(0xc8bea8);
+      for (let y = 6; y < size; y += 10) for (let x = (y / 10) % 2 ? 6 : 1; x < size; x += 10) g.rect(x, y, 8, 8).fill(0xbdb39c);
+      g.circle(size / 2, size / 2, 16).fill(0x9a958a).stroke({ width: 2, color: 0x5e5a52 });
+      g.circle(size / 2, size / 2, 11).fill(0x4f8cff);
+      g.circle(size / 2, size / 2, 3).fill(0xd8e8ff);
+      for (const [x, y] of [[10, 10], [size - 10, 10], [10, size - 10], [size - 10, size - 10]]) g.circle(x, y, 7).fill(0x3f7a34).stroke({ width: 1, color: 0x1a3a14 });
       break;
     }
     case 'farm': {

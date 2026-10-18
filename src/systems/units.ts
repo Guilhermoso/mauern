@@ -1,4 +1,5 @@
 import { BALANCE } from '../data/balance';
+import { isWorkshop, updateWorkOrder, workerOf } from './workshops';
 import { BUILDING_DEFS, FARM_GATHER_RATE, NODE_DEFS, buildingMessage } from '../data/defs';
 import { buildingMaxHp, carryCapacity, flat, mult, workSpeed } from './modifiers';
 import { getClock } from '../core/time';
@@ -59,6 +60,9 @@ export function updateUnits(sim: Sim): void {
         break;
       case 'train':
         if (!updateTraining(sim, u, o)) setIdle(u);
+        break;
+      case 'work':
+        if (!updateWorkOrder(sim, u, o)) setIdle(u);
         break;
       case 'follow':
         updateFollow(sim, u);
@@ -311,6 +315,12 @@ function afterBuilding(sim: Sim, u: Unit, b: Building): void {
     setOrder(u, { type: 'farm', buildingId: b.id, phase: 'collect' });
     return;
   }
+  // Oficina recém-construída: o construtor vira o trabalhador.
+  if (isWorkshop(b) && !workerOf(sim, b)) {
+    b.farmerId = u.id;
+    setOrder(u, { type: 'work', buildingId: b.id });
+    return;
+  }
   const other = findUnfinishedBuilding(sim, u.x, u.y, radius);
   if (other) {
     setOrder(u, { type: 'build', buildingId: other.id });
@@ -386,6 +396,12 @@ export function unitStatus(sim: Sim, u: Unit): string {
       return u.moving ? 'Marchando com o batalhão' : 'Em formação';
     case 'flee':
       return 'Fugindo de um titã!';
+    case 'work': {
+      const b = sim.building(o.buildingId);
+      const role = b ? { pasture: 'Pastor', bakery: 'Padeiro', weaver: 'Tecelão' }[b.kind as 'pasture'] ?? 'Trabalhador' : 'Trabalhador';
+      const fem = { Pastor: 'Pastora', Padeiro: 'Padeira', Tecelão: 'Tecelã', Trabalhador: 'Trabalhadora' }[role];
+      return u.moving ? `Indo trabalhar${b ? ` em ${BUILDING_DEFS[b.kind].name.toLowerCase()}` : ''}` : `${f ? fem : role}${b ? ` — ${BUILDING_DEFS[b.kind].name.toLowerCase()}` : ''}`;
+    }
   }
 }
 

@@ -167,6 +167,49 @@ export const BUILDING_DEFS: Record<BuildingKind, BuildingDef> = {
     dropsite: [], walkable: false, trains: [], hotkey: 'KeyO', garrison: 8, era: 1,
     attack: { damage: 8, cooldown: 1.6, range: 9, needsGarrison: false, damagePerGarrison: 1.5 },
   },
+  // Era II — cadeias de produção e serviços
+  pasture: {
+    name: 'Pasto de Ovelhas',
+    feminine: false,
+    description: 'Um pastor cuida das ovelhas e produz lã (menos no inverno). A lã vira roupas na Tecelagem.',
+    size: 3, maxHp: 500, housing: 0, cost: { wood: 120 }, buildTime: 25,
+    dropsite: [], walkable: true, trains: [], hotkey: 'KeyP', garrison: 0, era: 1,
+  },
+  bakery: {
+    name: 'Padaria',
+    feminine: true,
+    description: 'Um padeiro transforma comida em pão. Sobrados precisam de pão.',
+    size: 2, maxHp: 700, housing: 0, cost: { wood: 150, stone: 60 }, buildTime: 35,
+    dropsite: [], walkable: false, trains: [], hotkey: 'KeyL', garrison: 0, era: 1,
+  },
+  weaver: {
+    name: 'Tecelagem',
+    feminine: true,
+    description: 'Um tecelão transforma lã em roupas. Sobrados precisam de roupas.',
+    size: 2, maxHp: 700, housing: 0, cost: { wood: 160, stone: 40 }, buildTime: 35,
+    dropsite: [], walkable: false, trains: [], garrison: 0, era: 1,
+  },
+  chapel: {
+    name: 'Capela',
+    feminine: true,
+    description: 'Fé para as casas por perto. Sobrados precisam de uma capela.',
+    size: 2, maxHp: 900, housing: 0, cost: { wood: 100, stone: 150, gold: 40 }, buildTime: 50,
+    dropsite: [], walkable: false, trains: [], garrison: 0, era: 1,
+  },
+  market: {
+    name: 'Mercado',
+    feminine: false,
+    description: 'Compra e vende recursos por ouro. Quanto mais se troca um recurso, pior fica o preço (ele volta ao normal com o tempo).',
+    size: 3, maxHp: 1000, housing: 0, cost: { wood: 250, stone: 100 }, buildTime: 50,
+    dropsite: [], walkable: false, trains: [], garrison: 0, era: 1,
+  },
+  plaza: {
+    name: 'Praça',
+    feminine: true,
+    description: 'Ponto de encontro dos moradores: melhora a moral conforme as casas que tem por perto.',
+    size: 3, maxHp: 600, housing: 0, cost: { stone: 120, gold: 20 }, buildTime: 30,
+    dropsite: [], walkable: true, trains: [], garrison: 0, era: 1,
+  },
   bonfire: {
     name: 'Fogueira Comunitária',
     feminine: true,
@@ -180,6 +223,7 @@ export const BUILDING_DEFS: Record<BuildingKind, BuildingDef> = {
 export const VILLAGER_BUILDS: BuildingKind[] = [
   'house', 'well', 'bonfire', 'lumberCamp', 'miningCamp', 'mill', 'farm', 'palisade', 'gate', 'watchTower', 'trainingGround', 'refuge', 'hospital',
   'barracks', 'archeryRange', 'stoneWall', 'stoneGate', 'stoneTower',
+  'pasture', 'bakery', 'weaver', 'chapel', 'market', 'plaza',
 ];
 
 export interface UnitDef {
@@ -263,6 +307,9 @@ export const RESOURCE_NAMES: Record<ResourceKind, string> = {
   stone: 'Pedra',
   iron: 'Ferro',
   gold: 'Ouro',
+  wool: 'Lã',
+  bread: 'Pão',
+  clothes: 'Roupas',
 };
 
 export function formatCost(cost: Cost): string {

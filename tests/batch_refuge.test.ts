@@ -12,7 +12,7 @@ import type { GameState } from '../src/state';
 const TS = BALANCE.world.tileSize;
 
 function rich(s: GameState) {
-  s.resources = { food: 5000, wood: 5000, stone: 5000, iron: 0, gold: 500 };
+  s.resources = { food: 5000, wood: 5000, stone: 5000, iron: 0, gold: 500, wool: 0, bread: 0, clothes: 0 };
 }
 
 describe('treino em lotes', () => {

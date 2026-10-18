@@ -12,7 +12,7 @@ const TS = BALANCE.world.tileSize;
 function setup() {
   const s = flatGame();
   setNoon(s);
-  s.resources = { food: 5000, wood: 5000, stone: 5000, iron: 0, gold: 5000 };
+  s.resources = { food: 5000, wood: 5000, stone: 5000, iron: 0, gold: 5000, wool: 0, bread: 0, clothes: 0 };
   const h = newBuilding(s.nextId++, 'hospital', CENTER + 8, CENTER - 2, true);
   s.buildings.push(h);
   const sim = new Sim(s);

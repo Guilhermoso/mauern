@@ -5,7 +5,7 @@ import type { Sim } from '../core/sim';
 import type { SelectionController } from '../input/selection';
 import { canAfford, canPlace } from '../systems/commands';
 import { titanRadius } from '../systems/damage';
-import { serviceRadius } from '../systems/city';
+import { serviceRadius, type ServiceKind } from '../systems/city';
 import { unitMaxHp } from '../systems/modifiers';
 import { drawBuildingArt } from './buildingArt';
 
@@ -111,20 +111,22 @@ export class OverlayLayer {
 
     // Alcance de poços e fogueiras: aparece ao posicionar casas/poços/fogueiras ou com uma casa selecionada.
     const selB = s.building !== null ? sim.building(s.building) : undefined;
-    const showCoverage =
-      sel.placing === 'house' || sel.placing === 'well' || sel.placing === 'bonfire' || selB?.kind === 'house' || selB?.kind === 'well' || selB?.kind === 'bonfire';
+    // Serviços (poço, fogueira, capela, praça): alcance ao posicionar ou com uma casa ou serviço selecionado.
+    const SERVICE_COLORS: Record<ServiceKind, number> = { well: 0x4fa3ff, bonfire: 0xff9a3c, chapel: 0xf2e6a0, plaza: 0x9be37f };
+    const isService = (k?: string): k is ServiceKind => !!k && k in SERVICE_COLORS;
+    const showCoverage = sel.placing === 'house' || isService(sel.placing ?? undefined) || selB?.kind === 'house' || isService(selB?.kind);
     if (showCoverage) {
       for (const b of sim.state.buildings) {
-        if (b.kind !== 'well' && b.kind !== 'bonfire') continue;
+        if (!isService(b.kind)) continue;
         const size = BUILDING_DEFS[b.kind].size;
-        const color = b.kind === 'well' ? 0x4fa3ff : 0xff9a3c;
+        const color = SERVICE_COLORS[b.kind];
         under.circle((b.tx + size / 2) * ts, (b.ty + size / 2) * ts, serviceRadius(sim, b.kind) * ts).fill({ color, alpha: 0.07 }).stroke({ width: line, color, alpha: 0.6 });
       }
-      if ((sel.placing === 'well' || sel.placing === 'bonfire') && pt0()) {
+      const placing = sel.placing ?? undefined;
+      if (isService(placing) && pt0()) {
         const p = pt0()!;
-        const size = BUILDING_DEFS[sel.placing].size;
-        const color = sel.placing === 'well' ? 0x4fa3ff : 0xff9a3c;
-        under.circle((p.tx + size / 2) * ts, (p.ty + size / 2) * ts, serviceRadius(sim, sel.placing) * ts).stroke({ width: line * 1.5, color });
+        const size = BUILDING_DEFS[placing].size;
+        under.circle((p.tx + size / 2) * ts, (p.ty + size / 2) * ts, serviceRadius(sim, placing) * ts).stroke({ width: line * 1.5, color: SERVICE_COLORS[placing] });
       }
     }
 

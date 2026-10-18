@@ -7,6 +7,7 @@ import { addLog } from '../state';
 import type { Building } from '../entities/types';
 import { flat, mult } from './modifiers';
 import { addMoraleMod } from './damage';
+import { recoverPrices } from './market';
 
 const C = BALANCE.city;
 const M = BALANCE.morale;
@@ -19,11 +20,14 @@ function center(b: Building): { x: number; y: number } {
   return { x: b.tx + s / 2, y: b.ty + s / 2 };
 }
 
-export function serviceRadius(sim: Sim, kind: 'well' | 'bonfire'): number {
-  return kind === 'well' ? C.wellRadius + flat(sim.state, 'wellRadius') : C.bonfireRadius;
+export type ServiceKind = 'well' | 'bonfire' | 'chapel' | 'plaza';
+
+export function serviceRadius(sim: Sim, kind: ServiceKind): number {
+  if (kind === 'well') return C.wellRadius + flat(sim.state, 'wellRadius');
+  return { bonfire: C.bonfireRadius, chapel: C.chapelRadius, plaza: C.plazaRadius }[kind];
 }
 
-export function isCovered(sim: Sim, house: Building, kind: 'well' | 'bonfire'): boolean {
+export function isCovered(sim: Sim, house: Building, kind: ServiceKind): boolean {
   const r = serviceRadius(sim, kind);
   const h = center(house);
   return sim.state.buildings.some((b) => {
@@ -44,7 +48,52 @@ export function missingNeeds(sim: Sim, house: Building, level: number): string[]
     if (!isCovered(sim, house, 'bonfire')) out.push('fogueira comunitária por perto');
     if (sim.state.morale < C.level3Morale) out.push(`moral ${C.level3Morale} ou mais`);
   }
+  if (level >= 4) {
+    const s = sim.state;
+    if (!isCovered(sim, house, 'chapel')) out.push('capela por perto');
+    if (s.city.lackBread || s.resources.bread < C.breadPerSobradoPerDay) out.push('pão (padaria)');
+    if (s.city.lackClothes || s.resources.clothes < C.clothesPerSobradoPerDay) out.push('roupas (tecelagem)');
+    if (s.morale < C.level4Morale) out.push(`moral ${C.level4Morale} ou mais`);
+  }
   return out;
+}
+
+// Nível máximo de casa na era atual (o sobrado chega na Era II).
+export function maxHouseLevel(sim: Sim): number {
+  return sim.state.era >= 1 ? 4 : 3;
+}
+
+function canPayLevel(sim: Sim, next: number): boolean {
+  const r = sim.state.resources;
+  if (next === 3) return r.stone >= C.level3StoneCost;
+  if (next === 4) return r.stone >= (C.level4Cost.stone ?? 0) && r.wood >= (C.level4Cost.wood ?? 0);
+  return true;
+}
+
+function payLevel(sim: Sim, next: number): void {
+  const r = sim.state.resources;
+  if (next === 3) r.stone -= C.level3StoneCost;
+  if (next === 4) {
+    r.stone -= C.level4Cost.stone ?? 0;
+    r.wood -= C.level4Cost.wood ?? 0;
+  }
+}
+
+// Consumo dos sobrados (a cada hora): pão e roupas. Faltando, eles regridem e a moral cai.
+function sobradoConsumption(sim: Sim): void {
+  const s = sim.state;
+  const n = s.buildings.filter((b) => b.kind === 'house' && b.built && b.level >= 4).length;
+  const use = (kind: 'bread' | 'clothes', perDay: number): boolean => {
+    const need = (n * perDay) / 24;
+    if (s.resources[kind] >= need) {
+      s.resources[kind] -= need;
+      return false;
+    }
+    s.resources[kind] = 0;
+    return n > 0;
+  };
+  s.city.lackBread = use('bread', C.breadPerSobradoPerDay);
+  s.city.lackClothes = use('clothes', C.clothesPerSobradoPerDay);
 }
 
 function updateHouses(sim: Sim): void {
@@ -62,13 +111,12 @@ function updateHouses(sim: Sim): void {
       continue;
     }
     b.missingHours = 0;
-    if (b.level >= 3) continue;
+    if (b.level >= maxHouseLevel(sim)) continue;
     const next = b.level + 1;
-    const stoneOk = next < 3 || s.resources.stone >= C.level3StoneCost;
-    if (missingNeeds(sim, b, next).length === 0 && stoneOk) {
+    if (missingNeeds(sim, b, next).length === 0 && canPayLevel(sim, next)) {
       b.needHours++;
       if (b.needHours >= C.upgradeHours) {
-        if (next === 3) s.resources.stone -= C.level3StoneCost;
+        payLevel(sim, next);
         b.level = next;
         b.needHours = 0;
       }
@@ -112,6 +160,13 @@ export function moraleTarget(sim: Sim): MoraleBreakdown {
     const covered = houses.filter((h) => isCovered(sim, h, 'bonfire')).length / houses.length;
     if (covered > 0) parts.push({ label: 'Fogueiras', value: Math.round(covered * M.bonfireCoverage) });
   }
+  const sobrados = houses.filter((b) => b.level >= 4).length;
+  if (sobrados && s.city.lackBread) parts.push({ label: 'Falta de pão', value: C.lackBreadMorale });
+  if (sobrados && s.city.lackClothes) parts.push({ label: 'Falta de roupas', value: C.lackClothesMorale });
+  if (houses.length) {
+    const plaza = houses.filter((h) => isCovered(sim, h, 'plaza')).length / houses.length;
+    if (plaza > 0) parts.push({ label: 'Praças', value: Math.round(plaza * C.plazaMorale) });
+  }
   const relic = flat(s, 'morale');
   if (relic) parts.push({ label: 'Relíquias', value: relic });
   // Acontecimentos recentes (mortes, titãs abatidos, festivais...), somados por motivo.
@@ -152,7 +207,9 @@ function hourly(sim: Sim): void {
   s.resources.gold += whole;
   s.city.taxCarry -= whole;
 
+  sobradoConsumption(sim);
   updateHouses(sim);
+  recoverPrices(sim);
 
   // Moral
   s.moraleMods = s.moraleMods.filter((m) => m.expiresTick > s.tick);

@@ -493,6 +493,63 @@ const DRAW: Record<string, (ctx: Ctx) => void> = {
       circle(c, x, y, 6, '', '#b8862e', 1.5);
     }
   },
+  'res-wool': (c) => {
+    for (const [x, y, r] of [[24, 30, 12], [38, 28, 13], [30, 40, 13], [44, 40, 10], [18, 42, 9]] as [number, number, number][]) circle(c, x, y, r, '#f2efe6', '#9a948a', 1.5);
+  },
+  'res-bread': (c) => {
+    c.beginPath();
+    c.ellipse(32, 36, 24, 14, -0.2, 0, Math.PI * 2);
+    c.fillStyle = '#c8904a';
+    c.fill();
+    c.lineWidth = 2.5;
+    c.strokeStyle = '#6a4020';
+    c.stroke();
+    for (let i = 0; i < 3; i++) line(c, [20 + i * 10, 30 + i * 1, 26 + i * 10, 40 - i], '#f2d49a', 2.5);
+  },
+  'res-clothes': (c) => {
+    poly(c, [20, 10, 28, 14, 36, 14, 44, 10, 56, 20, 50, 28, 46, 24, 46, 56, 18, 56, 18, 24, 14, 28, 8, 20], '#6a5aa8', '#2a1a4a', 2);
+    line(c, [32, 16, 32, 56], '#4a3a88', 1.5);
+  },
+  pasture: (c) => {
+    rect(c, 6, 10, 52, 44, '#7aa83e', '#8b5e34', 3);
+    for (const [x, y] of [[20, 26], [40, 22], [30, 40]] as [number, number][]) {
+      circle(c, x, y, 8, '#f2efe6', '#9a948a', 1.5);
+      circle(c, x + 7, y - 2, 3.5, '#3a3530', '', 0);
+    }
+  },
+  bakery: (c) => {
+    rect(c, 10, 26, 44, 28, '#d8c49a');
+    poly(c, [6, 28, 32, 10, 58, 28], ROOF);
+    rect(c, 42, 10, 6, 12, STONE, '#3a3530', 1.5);
+    DRAW['res-bread'](c);
+  },
+  weaver: (c) => {
+    rect(c, 10, 26, 44, 28, '#d8c49a');
+    poly(c, [6, 28, 32, 10, 58, 28], '#5a6a8a');
+    for (let i = 0; i < 4; i++) line(c, [18 + i * 9, 32, 18 + i * 9, 52], '#6a5aa8', 3);
+    line(c, [14, 42, 50, 42], '#f2efe6', 3);
+  },
+  chapel: (c) => {
+    rect(c, 18, 26, 28, 30, '#e8dcc6');
+    poly(c, [14, 28, 32, 12, 50, 28], '#5a4a6a');
+    rect(c, 29, 2, 6, 14, '#8a7a5a', '', 0);
+    rect(c, 24, 6, 16, 4, '#8a7a5a', '', 0);
+    poly(c, [27, 56, 27, 42, 32, 36, 37, 42, 37, 56], '#5a3a1e', '', 0);
+  },
+  market: (c) => {
+    for (let i = 0; i < 3; i++) {
+      poly(c, [6 + i * 18, 26, 15 + i * 18, 14, 24 + i * 18, 26], i % 2 ? '#c8283c' : '#e8dcc6', '#5a3a1e', 1.5);
+      rect(c, 8 + i * 18, 26, 14, 18, '#a07448', '#5a3a1e', 1.5);
+    }
+    circle(c, 22, 52, 5, GOLD, '#6a4a10', 1.5);
+    circle(c, 34, 54, 5, GOLD, '#6a4a10', 1.5);
+  },
+  plaza: (c) => {
+    rect(c, 6, 6, 52, 52, '#c8bea8', '#8a8070', 2);
+    circle(c, 32, 32, 14, '#9a958a', '#5e5a52', 2);
+    circle(c, 32, 32, 8, '#4f8cff', '', 0);
+    for (const [x, y] of [[12, 12], [52, 12], [12, 52], [52, 52]] as [number, number][]) circle(c, x, y, 5, '#3f7a34', '', 0);
+  },
   'res-pop': (c) => house(c, 14, 14, 36, 40, '#3a6fd8', '#d8c49a'),
 
   // --- Pontos de interesse ---

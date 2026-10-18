@@ -31,6 +31,8 @@ export class Hud {
   readonly topbar = document.createElement('div');
   readonly resPanel = document.createElement('div'); // recursos ao lado do minimapa (estilo AoE3)
   private gathererEls = new Map<ResourceKind, HTMLElement>();
+  private goodsRow = document.createElement('div'); // lã, pão e roupas (Era II)
+  private goodsEls = new Map<ResourceKind, HTMLElement>();
   readonly log = document.createElement('div');
   readonly toasts = document.createElement('div');
   private resEls = new Map<ResourceKind, HTMLElement>();
@@ -75,6 +77,17 @@ export class Hud {
       this.resWrap.set(r.key, row);
       this.gathererEls.set(r.key, count);
     }
+    this.goodsRow.className = 'res-goods hidden';
+    for (const [k, label] of [['wool', 'Lã (pasto)'], ['bread', 'Pão (padaria)'], ['clothes', 'Roupas (tecelagem)']] as [ResourceKind, string][]) {
+      const item = document.createElement('span');
+      item.className = 'good';
+      item.title = label;
+      const b = document.createElement('b');
+      item.append(cmdIconImg(`res-${k}`, 'good-icon'), b);
+      this.goodsRow.appendChild(item);
+      this.goodsEls.set(k, b);
+    }
+    this.resPanel.appendChild(this.goodsRow);
 
     this.moraleEl.className = 'morale';
     this.topbar.appendChild(this.moraleEl);
@@ -143,12 +156,14 @@ export class Hud {
     const state = sim.state;
     for (const r of RESOURCES) this.resEls.get(r.key)!.textContent = String(Math.floor(state.resources[r.key]));
     // Aldeões trabalhando em cada recurso (fazendeiros contam como comida).
-    const working: Record<ResourceKind, number> = { food: 0, wood: 0, stone: 0, iron: 0, gold: 0 };
+    const working: Record<ResourceKind, number> = { food: 0, wood: 0, stone: 0, iron: 0, gold: 0, wool: 0, bread: 0, clothes: 0 };
     for (const u of state.units) {
       if (u.order.type === 'farm') working.food++;
       else if (u.order.type === 'gather') working[NODE_DEFS[u.order.nodeKind].resource]++;
     }
     for (const r of RESOURCES) this.gathererEls.get(r.key)!.textContent = String(working[r.key]);
+    this.goodsRow.classList.toggle('hidden', state.era < 1);
+    for (const [k, el] of this.goodsEls) el.textContent = String(Math.floor(state.resources[k]));
     this.eraBtn.textContent = ERA_NAMES[state.era];
     // Dicas com consumo e produção.
     const fpd = foodPerDay(sim);

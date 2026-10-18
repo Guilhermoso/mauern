@@ -11,6 +11,7 @@ import type {
   MemorialEntry,
   MoraleModifier,
   Poi,
+  ResourceKind,
   Resources,
   Stats,
   ThreatState,
@@ -22,7 +23,7 @@ import { BUILDING_DEFS, UNIT_DEFS } from './data/defs';
 import { randomName } from './entities/names';
 import { generatePois } from './world/pois';
 
-export const SAVE_VERSION = 10;
+export const SAVE_VERSION = 11;
 
 export interface LogEntry {
   tick: number;
@@ -62,6 +63,7 @@ export interface GameState {
   memorial: MemorialEntry[];
   pois: Poi[];
   explored: Uint8Array; // névoa de guerra: 1 = tile já visto alguma vez
+  market: Partial<Record<ResourceKind, number>>; // mercado: fator de preço de cada recurso (1 = preço base)
   nextId: number;
   camera: CameraState;
   log: LogEntry[];
@@ -115,7 +117,8 @@ export function createNewGame(seed: string): GameState {
     morale: BALANCE.morale.start,
     moraleMods: [],
     stats: newStats(),
-    city: { starving: false, cold: false, hungerThisWinter: false, taxCarry: 0 },
+    city: { starving: false, cold: false, hungerThisWinter: false, taxCarry: 0, lackBread: false, lackClothes: false },
+    market: newMarket(),
     events: { nextDay: BALANCE.events.firstDay, active: null },
     battalions: [],
     battalionCount: 0,
@@ -161,7 +164,14 @@ export function newBuilding(id: number, kind: BuildingKind, tx: number, ty: numb
     doctorIds: [],
     upgradeProgress: -1,
     ruined: false,
+    produce: 0,
   };
+}
+
+export function newMarket(): Partial<Record<ResourceKind, number>> {
+  const out: Partial<Record<ResourceKind, number>> = {};
+  for (const k of Object.keys(BALANCE.market.basePrice) as ResourceKind[]) out[k] = 1;
+  return out;
 }
 
 export function newStats(): Stats {
@@ -171,7 +181,7 @@ export function newStats(): Stats {
     greatAttacksRepelled: 0,
     flawlessHordes: 0,
     hordeDeathsAtStart: -1,
-    gathered: { food: 0, wood: 0, stone: 0, iron: 0, gold: 0 },
+    gathered: { food: 0, wood: 0, stone: 0, iron: 0, gold: 0, wool: 0, bread: 0, clothes: 0 },
     moraleHighHours: 0,
     wintersSurvived: 0,
     wintersWithoutHunger: 0,

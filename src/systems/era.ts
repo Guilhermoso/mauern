@@ -10,7 +10,7 @@ import { addMoraleMod } from './damage';
 // O que cada era libera (texto para o aviso de nova era).
 export const ERA_UNLOCKS = [
   '',
-  'Quartel (lanceiros), Campo de Arqueiros (arqueiros), muro, portão e torre de pedra. Titãs maiores — e os primeiros anormais.',
+  'Quartel (lanceiros), Campo de Arqueiros (arqueiros), muro, portão e torre de pedra; Pasto, Padaria, Tecelagem, Capela, Mercado, Praça e sobrados. Titãs maiores — e os primeiros anormais.',
 ];
 
 // Avança para a próxima era, se todos os marcos foram cumpridos. Retorna erro ou null.

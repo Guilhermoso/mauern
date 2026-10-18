@@ -16,7 +16,7 @@ export const BALANCE = {
     duskHour: 19,
   },
   start: {
-    resources: { food: 200, wood: 150, stone: 50, iron: 0, gold: 0 },
+    resources: { food: 200, wood: 150, stone: 50, iron: 0, gold: 0, wool: 0, bread: 0, clothes: 0 },
     villagers: 4,
     scouts: 1,
   },
@@ -38,6 +38,24 @@ export const BALANCE = {
     maxTrainQueue: 10, // lotes na fila de um edifício
     maxBatch: 3, // unidades militares treinadas juntas num lote (aldeões: sempre 1)
     batchExtraTime: 0.8, // cada unidade extra do lote soma 80% do tempo de uma unidade
+  },
+  // Oficinas da Era II: um trabalhador por oficina.
+  workshops: {
+    pasture: { seconds: 4, input: {}, output: { wool: 1 } },
+    bakery: { seconds: 4, input: { food: 2 }, output: { bread: 1 } },
+    weaver: { seconds: 6, input: { wool: 2 }, output: { clothes: 1 } },
+  } as Record<string, { seconds: number; input: Partial<Record<'food' | 'wool', number>>; output: Partial<Record<'wool' | 'bread' | 'clothes', number>> }>,
+  pastureWinterFactor: 0.5, // o pasto produz metade no inverno
+  // Mercado: preço em ouro de um lote de 100.
+  market: {
+    lot: 100,
+    basePrice: { food: 40, wood: 40, stone: 50, iron: 90, wool: 60, bread: 100, clothes: 150 } as Record<string, number>,
+    sellFactor: 0.75, // vende por 75% do preço do momento
+    buyFactor: 1.25, // compra por 125%
+    step: 0.06, // cada troca move o preço 6%
+    recoverPerHour: 0.02, // e ele volta 2% por hora ao normal
+    minFactor: 0.3,
+    maxFactor: 3,
   },
   // Névoa de guerra: raio de visão em tiles.
   fog: {
@@ -179,10 +197,19 @@ export const BALANCE = {
   city: {
     foodPerPersonPerDay: 3.5, // consumo de comida por habitante
     winterWoodPerHouseLevel: 1.5, // lenha por dia de inverno, por nível de casa
-    houseHousing: [5, 7, 10], // moradores por nível de casa (1 a 3)
-    houseTaxPerDay: [0, 2, 5], // ouro por dia por nível de casa
-    houseLevelNames: ['Barraca', 'Casa de madeira', 'Casa de pedra'],
+    houseHousing: [5, 7, 10, 14], // moradores por nível de casa (1 a 4)
+    houseTaxPerDay: [0, 2, 5, 9], // ouro por dia por nível de casa
+    houseLevelNames: ['Barraca', 'Casa de madeira', 'Casa de pedra', 'Sobrado'],
     level3StoneCost: 25, // pedra gasta para virar casa de pedra
+    level4Cost: { stone: 40, wood: 40 }, // gasto para virar sobrado (Era II)
+    level4Morale: 55,
+    chapelRadius: 11, // fé: casas a esta distância de uma capela
+    plazaRadius: 9,
+    plazaMorale: 8, // moral se todas as casas tiverem uma praça por perto
+    breadPerSobradoPerDay: 3, // consumo dos sobrados
+    clothesPerSobradoPerDay: 1,
+    lackBreadMorale: -8, // moral enquanto faltar pão (havendo sobrados)
+    lackClothesMorale: -5,
     upgradeHours: 2, // horas seguidas com as necessidades atendidas para evoluir
     downgradeHours: 12, // horas seguidas sem uma necessidade para regredir
     wellRadius: 7, // alcance do poço, em tiles
